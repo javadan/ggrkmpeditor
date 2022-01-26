@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+
+  <!-- HEAD element: load the stylesheet and the chart.js library -->
+  <head>
+    <title>GGR KMP Editor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="/static/js/smooth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/jstree.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css">
+  </head>
+
+  <!-- BODY element: create a canvas and render a chart on it -->
+  <body>
+
+<table>
+<tr>
+<td colspan=2>
+    <div class="wrapper" id="MOTION"/>
+</td>
+</tr>
+<tr>
+<td>
+    <!-- canvas element in a container -->
+    <div class="wrapper">
+      <canvas id="canvas" width="1600" height="900"></canvas>
+    </div>
+</td>
+<td>
+
+<p>
+Smoothing width
+<input type="range" class="slider" value="15" min="0" max="50" id="points" onchange="changeRange()">
+<div class="wrapper" id="WIDTH">
+</div>
+</p>
+
+<p>
+Times to repeat
+<input type="range" class="slider" value="5" min="1" max="50" id="repeatSlider" onchange="changeRepeat()">
+<div class="wrapper" id="TIMES">
+</div>
+</p>
+
+<p>
+Delay
+<input type="range" class="slider" step="0.001" value="0.005" min="0" max="0.25" id="delaySlider" onchange="changeDelay()">
+<div class="wrapper" id="DELAY">
+</div>
+</p>
+
+</td>
+</tr>
+
+<tr>
+<td>
+<p>
+<div id="container">
+</div>
+</p>
+</td>
+</tr>
+<tr>
+
+<td>
+<form name="SAVE" id="SAVE" method="post" action="/save">
+
+<input type="text" id="saveName"/>  <input type="button" name="saveSubmit" id="saveButton" value="SAVE" onclick="save()" />
+</form>
+
+<form name="LOAD" id="LOAD" method="post" action="/load">
+
+<input type="text" id="loadName"/>  <input type="button" name="loadSubmit" id="loadButton" value="LOAD" onclick="load()" />
+</form>
+<br>
+
+<button onclick="run()">RUN</button>
+<button onclick="stop()">SET ANGLES to 90</button>
+<br/>
+</td>
+</tr>
+
+</table>
+
+
+
+<script type="text/javascript">
+
+// some data to be plotted
+var x_data = {{leg_data.x}};
+var y_data_1 = {{leg_data.front_right}};
+var y_data_2 = {{leg_data.front_left}};
+var y_data_3 = {{leg_data.back_right}};
+var y_data_4 = {{leg_data.back_left}};
+var MOTION = '{{leg_data.MOTION}}';
+
+
+var RANGE = 15;
+var TIMES_VAL = 5;
+var DELAY_VAL = 0.005;
+
+document.getElementById("MOTION").innerHTML=String(MOTION); 
+document.getElementById("WIDTH").innerHTML=String(RANGE); 
+document.getElementById("TIMES").innerHTML=String(TIMES_VAL); 
+document.getElementById("DELAY").innerHTML=String(DELAY_VAL); 
+
+// UI only
+function changeRange(event) {
+   RANGE = document.getElementById("points").value;
+   document.getElementById("WIDTH").innerHTML=String(RANGE); 
+
+};
+ 
+//TELL BACKEND
+function changeRepeat(event) {
+   TIMES_VAL = document.getElementById("repeatSlider").value;
+   document.getElementById("TIMES").innerHTML=String(TIMES_VAL); 
+
+ var saveData = [{"times":TIMES_VAL}];
+
+ $.ajax({
+   type: "POST",
+   url: "/setrepeat",
+   data: JSON.stringify(saveData),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+};
+
+
+//TELL BACKEND
+function changeDelay(event) {
+   DELAY_VAL = document.getElementById("delaySlider").value;
+   document.getElementById("DELAY").innerHTML=String(DELAY_VAL); 
+
+ var saveData = [{"delay":DELAY_VAL}];
+
+ $.ajax({
+   type: "POST",
+   url: "/setdelay",
+   data: JSON.stringify(saveData),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+};
+
+// globals
+var activePoint = null;
+var canvas = null;
+
+
+var datasetValues =  {
+        data: {
+            labels: x_data,
+            datasets: [
+                {
+                    data: y_data_1,
+                    label: "Front Right",
+                    borderColor: "#3e95cd",
+                    fill: false
+                },
+                {
+                    data: y_data_2,
+                    label: "Front Left",
+                    borderColor: "#cd953e",
+                    fill: false
+                },
+                {
+                    data: y_data_3,
+                    label: "Back Right",
+                    borderColor: "#ffff00",
+                    fill: false
+                },
+                {
+                    data: y_data_4,
+                    label: "Back Left",
+                    borderColor: "#0000ff",
+                    fill: false
+                }
+            ]
+        }};
+
+// draw a line chart on the canvas context
+window.onload = function () {
+
+
+    // Draw a line chart with two data sets
+    var ctx = document.getElementById("canvas").getContext("2d");
+    canvas = document.getElementById("canvas");
+    window.myChart = Chart.Line(ctx, {
+        data: datasetValues.data,
+        options: {
+            animation: {
+                duration: 0
+            },
+            tooltips: {
+                mode: 'nearest'
+            },
+      scales: {
+         xAxes: [{
+            ticks: {
+               userCallback: function(item, index) {
+                  if (!(index % 5)) return item;
+               },
+               autoSkip: false
+            }
+         }],
+         yAxes: [{
+            ticks: {
+               beginAtZero: true
+            }
+         }]
+      } 
+       }
+    });
+
+    // set pointer event handlers for canvas element
+    canvas.onpointerdown = down_handler;
+    canvas.onpointerup = up_handler;
+    canvas.onpointermove = null;
+};
+
+function down_handler(event) {
+    // check for data point near event location
+    const points = window.myChart.getElementAtEvent(event, {intersect: false});
+    if (points.length > 0) {
+        // grab nearest point, start dragging
+        activePoint = points[0];
+        canvas.onpointermove = move_handler;
+    };
+};
+
+function up_handler(event) {
+    // release grabbed point, stop dragging
+    activePoint = null;
+    canvas.onpointermove = null;
+};
+
+
+function divideIfNotZero(numerator, denominator) {
+  if (denominator === 0 || isNaN(denominator)) {
+        return 0;
+  }
+  else {
+        return numerator / denominator;
+  }
+}
+
+
+
+function move_handler(event)
+{
+    // locate grabbed point in chart data
+    if (activePoint != null) {
+        var data = activePoint._chart.data;
+        var datasetIndex = activePoint._datasetIndex;
+
+        // read mouse position
+        const helpers = Chart.helpers;
+        var position = helpers.getRelativePosition(event, myChart);
+
+        // convert mouse position to chart y axis value 
+        var chartArea = window.myChart.chartArea;
+        var yAxis = window.myChart.scales["y-axis-0"];
+        var yValue = map(position.y, chartArea.bottom, chartArea.top, yAxis.min, yAxis.max);
+
+        // update y value of active data point
+        data.datasets[datasetIndex].data[activePoint._index] = yValue;
+
+
+        RANGE = parseInt(RANGE);
+        ARRLEN = data.datasets[datasetIndex].data.length;
+        
+        if (activePoint._index <= RANGE)
+        {
+           var s = Smooth(
+		[
+		data.datasets[datasetIndex].data[0],
+		data.datasets[datasetIndex].data[activePoint._index],
+		data.datasets[datasetIndex].data[activePoint._index*2 ]
+                ]);
+           
+           for (var n = 0; n < activePoint._index*2; n++)
+           {
+	       data.datasets[datasetIndex].data[n] = s(parseFloat(n * divideIfNotZero(1,activePoint._index)));
+               console.log(parseFloat(n* divideIfNotZero(1, activePoint._index)));
+           }
+
+        }
+        else if (activePoint._index >= ARRLEN - RANGE)
+        {
+
+           console.log(ARRLEN - RANGE);
+           console.log(activePoint._index);
+           console.log(ARRLEN - 1);
+           var s = Smooth(
+                [
+                data.datasets[datasetIndex].data[ARRLEN - RANGE],
+                data.datasets[datasetIndex].data[activePoint._index],
+                data.datasets[datasetIndex].data[ARRLEN - 1]
+                ]);
+
+           for (var n = 0; n < ARRLEN - activePoint._index; n++)
+           {
+               data.datasets[datasetIndex].data[ARRLEN - n] = s(parseFloat(n * divideIfNotZero(1, ARRLEN - activePoint._index)));
+               console.log(parseFloat(n* divideIfNotZero(1, ARRLEN - activePoint._index)));
+           }
+
+
+        }
+        else {
+
+           console.log(activePoint._index - RANGE);
+           console.log(activePoint._index);
+           console.log(activePoint._index + RANGE);
+           var s = Smooth(
+		[
+		data.datasets[datasetIndex].data[activePoint._index - RANGE],
+		data.datasets[datasetIndex].data[activePoint._index],
+		data.datasets[datasetIndex].data[activePoint._index + RANGE]
+		]);          
+
+           for (var ndx = 0; ndx < 2*RANGE; ndx++)
+           {
+              data.datasets[datasetIndex].data[activePoint._index - RANGE + ndx] = s(parseFloat(ndx*divideIfNotZero(1,RANGE)));
+              console.log(parseFloat(ndx*divideIfNotZero(1,RANGE)));
+           }
+        }
+        window.myChart.update();
+    };
+};
+
+// map value to other coordinate system
+function map(value, start1, stop1, start2, stop2) {
+    return start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1))
+};
+
+function save() {
+
+ $('#SAVE').append('<input type="hidden" name="front_right" value="' + datasetValues.data.datasets[0].data.slice(0,131) + '" />');
+ $('#SAVE').append('<input type="hidden" name="front_left" value="' + datasetValues.data.datasets[1].data.slice(0,131) + '" />');
+ $('#SAVE').append('<input type="hidden" name="back_right" value="' + datasetValues.data.datasets[2].data.slice(0,131) + '" />');
+ $('#SAVE').append('<input type="hidden" name="back_left" value="' + datasetValues.data.datasets[3].data.slice(0,131) + '" />');
+ $('#SAVE').append('<input type="hidden" name="id" value="' +  $("#saveName").val() + '" />');
+
+ $("#SAVE").submit();
+}
+
+
+$("#container").on(
+        "select_node.jstree", function(evt, data){
+            $("#saveName").val(data.node.id);
+            $("#loadName").val(data.node.id);
+        }
+);
+
+
+
+function load() {
+ //var loadData = [{"id": $('#container').jstree('get_selected')}];
+ //if (loadData === undefined) {return;}
+
+ $('#LOAD').append('<input type="hidden" name="id" value="' +  $('#container').jstree('get_selected') + '" />');
+ $("#LOAD").submit();
+}
+
+
+function run() {
+ var saveData = [{"front_right":datasetValues.data.datasets[0].data},
+                 {"front_left":datasetValues.data.datasets[1].data},
+                 {"back_right":datasetValues.data.datasets[2].data},
+                 {"back_left":datasetValues.data.datasets[3].data}];
+
+
+ $.ajax({
+   type: "POST",
+   url: "/runmotion",
+   data: JSON.stringify(saveData),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+}
+
+
+function stop() {
+
+ var saveData = [{}];
+
+ $.ajax({
+   type: "POST",
+   url: "/stop",
+   data: JSON.stringify(saveData),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+}
+
+
+
+/*Search and JS Folder Tree*/
+$(function () {
+    $('#container').jstree({
+	'core' : {
+		'data' : {
+			'url' : function (node) {
+                                return '/getdirs';
+                        },
+			'data' : function (node) {
+				return { 'id' : node.id };
+			}
+		}
+	}});
+});
+
+
+
+</script>       
+
+
+
+   
+  </body>
+
+</html>
