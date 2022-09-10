@@ -3,181 +3,11 @@
 
   <!-- HEAD element: load the stylesheet and the chart.js library -->
   <head>
-    <title>GGR KMP Editor 4 Servos</title>
+    <title>GGR KMP Editor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="/static/js/smooth.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/jstree.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.4/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.6.1/d3.js"></script>
-
-    <script type="text/javascript" charset="utf-8">
-        $(document).ready(function() {
-            // Connect to the Socket.IO server.
-            // The connection URL has the following format, relative to the current page:
-            //     http[s]://<domain>:<port>[/<namespace>]
-            //var socket = io();
-            var socket = io.connect('http://'+document.domain+':'+location.port);
-            
-            socket.on('connect', function() {
-	        console.log("Connected to Lidar");
-                $('#log').append("Connected to LIDAR");
-            });
-            // Event handler for new connections.
-            // The callback function is invoked when a connection with the
-            // server is established.
-            socket.on('server_info', function(msg) {
-                $('#log').append(msg.data);
-            });
-
-//            const degrees_to_radians = deg => (deg * Math.PI) / 180.0;
-
-            var color = d3.scaleOrdinal(d3.schemeCategory10); 
-            const c = d3.color("steelblue");
-
-
-
-	    var latest_data = [];
-
-            socket.on('lidar_data', function(data) {
-
-		latest_data = [];
-		for (var i = 0; i < 360; i++) {
-	            latest_data.push([i, data.data[i]]);	
-		}
-
-		              
-		                
-		                  var line = d3.lineRadial()
-		                       .radius(function(d) {
-		                         return r(d[1]);
-		                       })
-		                       .angle(function(d) {
-		                         return d[0]*Math.PI/180;
-		                       });
-		      
-		      
-		      		svg.selectAll(".point")
-					.data(latest_data, d => d[0])
-		                        .join(
-					   enter => enter
-						.append("circle")
-		                        	.attr("class", "point")
-		                        	.attr("transform", function(d) {
-		                           		var coors = line([d]).slice(1).slice(0,-1);
-		                           		return "translate(" + coors + ")";
-		                        	})
-		                        	.attr("r", 2)
-		                        	.attr("fill",function(d,i){
-		                          	return c;//color(i);
-		                        	})
-					   ,
-					   update => update
-						.transition().duration(100)
-		                        	.attr("transform", function(d) {
-		                           		var coors = line([d]).slice(1).slice(0,-1);
-		                           		return "translate(" + coors + ")";
-		                        	}).selection()
-
-					);
-	
-
-            });
-        });
-
-    </script>    
-
-
-
-   <!-- polar coords d3 styles  -->
-        <style>
-      .frame {
-        fill: none;
-        stroke: #000;
-      }
-
-      .axis text {
-        font: 10px sans-serif;
-      }
-
-      .axis line,
-      .axis circle {
-        fill: none;
-        stroke: steelblue;
-        stroke-dasharray: 4;
-      }
-
-      .axis:last-of-type circle {
-        stroke: steelblue;
-        stroke-dasharray: none;
-      }
-
-      .line {
-        fill: none;
-        stroke: orange;
-        stroke-width: 3px;
-      }
-
-      .d3div {
-          transform: translateY(-300px);
-      }
-
-      .vertical-center {
-        margin: 0;
-        position: absolute;
-	vertical-align:middle;
-        top: 50%;
-        -ms-transform: translateY(-50%);
-        transform: translateY(-50%);
-      }
-
-	
-	.horizontal-slider-wrapper {
-	  display: inline-block;
-	  width: 150px;
-	  height: 20px;
-	  padding: 0;
-	}
-	.horizontal-slider-wrapper input {
-	  width: 150px;
-	  height: 20px;
-	  margin: 0;
-	}
-
-	.slider-wrapper {
-	  display: inline-block;
-	  width: 20px;
-	  height: 150px;
-	  padding: 0;
-	}
-	
-	.slider-wrapper2 {
-	  display: inline-block;
-	  width: 75px;
-	  height: 150px;
-	  padding: 0;
-	}
-	
-	.slider-wrapper input {
-	  width: 150px;
-	  height: 20px;
-	  margin: 0;
-	  transform-origin: 75px 75px;
-	  transform: rotate(-90deg);
-	}
-	
-	.slider-wrapper2 input {
-	  width: 150px;
-	  height: 20px;
-	  margin: 0;
-	  transform-origin: 75px 75px;
-	  transform: rotate(-90deg);
-	}
-
-	</style>
-
-
-
     <link rel="stylesheet" type="text/css" href="/static/css/style.css">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css">
@@ -186,519 +16,78 @@
   <!-- BODY element: create a canvas and render a chart on it -->
   <body>
 
-            <div id="log"></div>
 <table>
 <tr>
-	<td>
-		Loaded:
-	    <div class="wrapper2" id="MOTION"/>
-		    <br/>
-
-	
-	</td>
-	<td>
-	     <form name="MODE_FORM" id="MODE_FORM" method="post" action="/toggleMode"> 
-		     <input type="radio" id="Four" name="mode" value="Four" onclick="handleClick(this);"> <label for="Four">Four</label>
-		     <input type="radio" id="Eight" name="mode" value="Eight" onclick="handleClick(this);"> <label for="Eight">Eight</label>
-	     </form>
-	
-	     <br/>
-	
-	
-		
-	</td>
-
-	<!-- Lidar display on right side  -->
-	<td rowspan=3>
-		<div class="d3div" id="d3div"  /> 
-	</td>
-
+<td colspan=2>
+    <div class="wrapper" id="MOTION"/>
+</td>
 </tr>
+<tr>
+<td>
+    <!-- canvas element in a container -->
+    <div class="wrapper">
+      <canvas id="canvas" width="1600" height="900"></canvas>
+    </div>
+</td>
+<td>
 
+<p>
+Smoothing width
+<input type="range" class="slider" value="15" min="0" max="50" id="points" onchange="changeRange()">
+<div class="wrapper" id="WIDTH">
+</div>
+</p>
+
+<p>
+Times to repeat
+<input type="range" class="slider" value="5" min="1" max="50" id="repeatSlider" onchange="changeRepeat()">
+<div class="wrapper" id="TIMES">
+</div>
+</p>
+
+<p>
+Delay
+<input type="range" class="slider" step="0.001" value="0.005" min="0" max="0.25" id="delaySlider" onchange="changeDelay()">
+<div class="wrapper" id="DELAY">
+</div>
+</p>
+
+</td>
+</tr>
 
 <tr>
-
-	<td>	
-		    <input type="button" name="shuffler" id="shuffler" value="SHUFFLE" onclick="shuffleServos();" />	
-		    <input type="button" name="flipper" id="flipper" value="UPSIDE-DOWN AND BACKWARDS" onclick="flipper();" />	
-		    <input type="button" name="zeroer" id="zeroer" value="SET NINETIES" onclick="setEdgesToNinety();" />	
-	
-		    <table>
-	
-			<tr>
-				<td>
-				<input type="button" name="vfr" id="vfr" value="FR VFlip" onclick="vflip(0);" />	
-				<input type="button" name="vfl" id="vfl" value="FL VFlip" onclick="vflip(1);" />	
-				<input type="button" name="vbr" id="vbr" value="BR_VFlip" onclick="vflip(2);" />	
-				<input type="button" name="vbl" id="vbl" value="BL_VFlip" onclick="vflip(3);" />	
-				</td>
-			
-			</tr>
-			<tr>
-				<td>
-				<input type="button" name="bfr" id="bfr" value="FR_HFlip" onclick="hflip(0);" />	
-				<input type="button" name="bfl" id="bfl" value="FL_HFlip" onclick="hflip(1);" />	
-				<input type="button" name="bbr" id="bbr" value="BR_HFlip" onclick="hflip(2);" />	
-				<input type="button" name="bbl" id="bbl" value="BL_HFlip" onclick="hflip(3);" />	
-				</td>
-			
-			</tr>
-			<tr>
-				<td>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftFR" oninput="FRShift();" onchange="FRShift();">
-			          </div>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftFL" oninput="FLShift();" onchange="FLShift();">
-			          </div>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftBR" oninput="BRShift();" onchange="BRShift();">
-			          </div>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftBL" oninput="BLShift();" onchange="BLShift();">
-			          </div>
-
-				  <br/>
-			          <div class="horizontal-slider-wrapper">
-			            <input type="range" class="slider" step="1" value="0" min="-150" max="150" id="phaseFR" oninput="FRPhase();" onchange="FRPhase();">
-			          </div>
-				  <br/>
-			          <div class="horizontal-slider-wrapper">
-			            <input type="range" class="slider" step="1" value="0" min="-150" max="150" id="phaseFL" oninput="FLPhase();" onchange="FLPhase();">
-			          </div>
-				  <br/>
-			          <div class="horizontal-slider-wrapper">
-			            <input type="range" class="slider" step="1" value="0" min="-150" max="150" id="phaseBR" oninput="BRPhase();" onchange="BRPhase();">
-			          </div>
-				  <br/>
-			          <div class="horizontal-slider-wrapper">
-			            <input type="range" class="slider" step="1" value="0" min="-150" max="150" id="phaseBL" oninput="BLPhase();" onchange="BLPhase();">
-			          </div>
-
-				  <br/>
-
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step=".1" value="1" min="0.5" max="1.5" id="ampFR" oninput="FRAmp();" onchange="FRAmp();">
-			          </div>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step=".1" value="1" min="0.5" max="1.5" id="ampFL" oninput="FLAmp();" onchange="FLAmp();">
-			          </div>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step=".1" value="1" min="0.5" max="1.5" id="ampBR" oninput="BRAmp();" onchange="BRAmp();">
-			          </div>
-			          <div class="slider-wrapper2">
-			            <input type="range" class="slider" step=".1" value="1" min="0.5" max="1.5" id="ampBL" oninput="BLAmp();" onchange="BLAmp();">
-			          </div>
-
-
-				  <br/>
-
-				  <div class="wrapper">
-				    <img width="400" src="static/1234.png"/>
-			          </div>
-	
-				  <div class="wrapper">
-			            <canvas id="canvas" width="1600" height="900"></canvas>
-			          </div>
-				</td>
-			</tr>
-		    </table>
-        </td>
-
-	<td>
-
-	     <img id="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA == 1 }}">
-
-	     <input type="button" name="toggleCameraRefresh" id="toggleCameraRefresh" value="CAMERA ON/OFF" onclick="toggleCamera();" />	
-
-
-		<table>
-			<tr>
-				<td width="100"> Shift UP or DOWN
-				</td>
-				<td width="100"> Smoothing width
-				</td>
-				<td width="100"> Times to repeat
-				</td>
-				<td width="100"> Delay
-				</td>
-	
-			</tr>
-			<tr>
-				<td>
-	
-	<div class="wrapper2" id="SHIFT">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftSlider" oninput="changeShift()" onchange="changeShift()">
-	</div>
-				</td>
-				<td>
-	
-	<div class="wrapper2" id="WIDTH">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" value="15" min="0" max="50" id="points" oninput="changeRange()">
-	</div>
-				</td>
-				<td>
-	
-	<div class="wrapper2" id="TIMES">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" value="5" min="1" max="50" id="repeatSlider" oninput="changeRepeat()">
-	</div>
-	
-				</td>
-				<td>
-	
-	<div class="wrapper2" id="DELAY">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" step="0.001" value="0.005" min="0" max="0.25" id="delaySlider" oninput="changeDelay()">
-	</div>
-	
-	
-				</td>
-			</tr>
-	
-			<tr>
-				<td width="100">
-	Front Right Adjust
-				</td>
-				<td width="100">
-	Front Left Adjust
-				</td>
-				<td width="100">
-	Back Right Adjust
-				</td>
-				<td width="100">
-	Back Left Adjust
-				</td>
-	
-			</tr>
-	
-			<tr>
-				<td>
-	
-	<div class="wrapper2" id="front_right_adjust">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="front_right_slider" name="front_right_slider" onchange="changeFRShift()">
-	</div>
-				</td>
-				<td>
-	
-	<div class="wrapper2" id="front_left_adjust">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="front_left_slider" name="front_left_slider"  onchange="changeFLShift()">
-	</div>
-				</td>
-				<td>
-	
-	<div class="wrapper2" id="back_right_adjust">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="back_right_slider" name="back_right_slider" onchange="changeBRShift()">
-	</div>
-	
-				</td>
-				<td>
-	
-	<div class="wrapper2" id="back_left_adjust">
-	</div>
-	
-	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="back_left_slider" name="back_left_slider" onchange="changeBLShift()">
-	</div>
-	
-	
-				</td>
-			</tr>
-			<tr>
-				<td rowspan=4>
-					<br/><br/>
-				</td>
-			</tr>
-			<tr  style="vertical-align : middle; text-align:center;" >
-                               <td>
-                               </td>
-                               <td>
-				    <img src="static/up.png"/>
-                                
-                               </td>
-                               <td>
-				      = <div id="FORWARD" />
-                               </td>
-                               <td>
-                               </td>
-
-			</tr>
-
-			<tr  style="vertical-align : middle; text-align:center;" >
-                               <td>
-				    <img src="static/left.png"/>
-                               </td>
-                               <td>
-				      = <div id="LEFT" />
-                                
-                               </td>
-                               <td>
-				    <img src="static/right.png"/>
-                               </td>
-                               <td>
-				      = <div id="RIGHT" />
-                               </td>
-			</tr>
-
-			<tr  style="vertical-align : middle; text-align:center;" >
-                               <td>
-                               </td>
-                               <td>
-				    <img src="static/down.png"/>
-                               </td>
-                               <td>
-				      = <div id="BACKWARDS" />
-                               </td>
-                               <td>
-                               </td>
-			</tr>
-
-
-
-		</table>
-	
-	
-
-	</td>
-
-
+<td>
+<p>
+<div id="container">
+</div>
+</p>
+</td>
 </tr>
-
-
-
 <tr>
-	<td>
-	   <div id="container">
-	   </div>
-	</td>
 
-	<td>
-		<form name="SAVE" id="SAVE" method="post" action="/save">
-		
-		<input type="text" id="saveName"/>  <input type="button" name="saveSubmit" id="saveButton" value="SAVE" onclick="save()" />
-		</form>
-		
-		<form name="LOAD" id="LOAD" method="post" action="/load">
-		
-		<input type="text" id="loadName"/>  <input type="button" name="loadSubmit" id="loadButton" value="LOAD" onclick="load()" />
-		</form>
-		<br/>
-		
-		<button onclick="runadjusted()">RUN (Adjusted)</button>
-		<br/>
-		<button onclick="stop()">KILL SWITCH</button>
-		<button onclick="settoadjusters()">SET ANGLES to 90 + Adjusters</button>
-		<br/>
-	<!--	<button onclick="fiddleAroundAdjusted()">FIDGET TO THE WAVES</button> -->
-		<button onclick="runBrain()">TURN ON BRAIN</button>
-	
-	 <div class="container">
-               <div id="newtask">
-                <input name="addMotion" id="addMotion" type="text" >
-                <button id="push">Add to Script</button>
-               </div>
-               <div id="tasks"></div>
-               <div id="saveScript">
-                <input name="scriptName" id="scriptName" type="text" >
-                <button id="saveScriptButton">Save Script</button>
-	       </div>
-	 </div> 
-	
-	</td>
+<td>
+<form name="SAVE" id="SAVE" method="post" action="/save">
+
+<input type="text" id="saveName"/>  <input type="button" name="saveSubmit" id="saveButton" value="SAVE" onclick="save()" />
+</form>
+
+<form name="LOAD" id="LOAD" method="post" action="/load">
+
+<input type="text" id="loadName"/>  <input type="button" name="loadSubmit" id="loadButton" value="LOAD" onclick="load()" />
+</form>
+<br>
+
+<button onclick="run()">RUN</button>
+<button onclick="stop()">SET ANGLES to 90</button>
+<br/>
+</td>
 </tr>
-
 
 </table>
 
 
 
-
 <script type="text/javascript">
-
-
-        var width = 960,
-        height = 960,
-        radius = Math.min(width, height) / 2 - 30;
-
-        var r = d3.scaleLinear()
-          .domain([0, 1])
-          .range([0, radius]);
-
-        var line = d3.lineRadial()
-          .radius(function(d) {
-            return r(d[1]);
-          })
-          .angle(function(d) {
-            return -d[0] + Math.PI / 2;
-          });
-
-        var svg = d3.select("#d3div").append("svg")
-          .attr("width", width)
-          .attr("height", height)
-          .append("g")
-          .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
-
-        var gr = svg.append("g")
-          .attr("class", "r axis")
-          .selectAll("g")
-          .data(r.ticks(3).slice(1))
-          .enter().append("g");
-
-        gr.append("circle")
-          .attr("r", r);
-
-        var ga = svg.append("g")
-          .attr("class", "a axis")
-          .selectAll("g")
-          .data(d3.range(0, 360, 30))
-          .enter().append("g")
-          .attr("transform", function(d) {
-            return "rotate(" + -d + ")";
-          });
-
-        ga.append("line")
-          .attr("x2", radius);
-        
-          
-
-
-
-function toggleCamera() {
-
- $.ajax({
-   type: "GET",
-   url: "/toggleCamera",
-   dataType: 'json',
-   success: function(result) {
-     console.log(result);
-   }
- });
-    
-}
-
-
-function fiddleAroundAdjusted() {
-    console.log("FIDGETING...");
-    
-    var saveData = [{"front_right":datasetValues.data.datasets[0].data},
-                 {"front_left":datasetValues.data.datasets[1].data},
-                 {"back_right":datasetValues.data.datasets[2].data},
-                 {"back_left":datasetValues.data.datasets[3].data}];
-
-
- $.ajax({
-   type: "POST",
-   url: "/fidget",
-   data: JSON.stringify(saveData),
-   contentType: "application/json",
-   dataType: 'json',
-   success: function(result) {
-     console.log(result);
-   }
- });
-}
-
-
-
-function runBrain() {
-    console.log("TURNING ON BRAIN...");
-    
- $.ajax({
-   type: "POST",
-   url: "/runBrain",
-   data: {},
-   contentType: "application/json",
-   dataType: 'json',
-   success: function(result) {
-     console.log(result);
-   }
- });
-
-
-}
-
-function snapshot() {
-    console.log("SNAPSHOT");
-    $.get( {{ request.script_root|tojson|safe }} + '/snapshot', function( data ) {
-    console.log(data);
-    })
-}
-
-document.querySelector('#push').onclick = function(){
-    if(document.querySelector('#newtask input').value.length == 0){
-        alert("Add Motions to Script")
-    }
-    else{
-        document.querySelector('#tasks').innerHTML += `
-            <div class="task">
-                <span id="taskname">
-                    ${document.querySelector('#newtask input').value}
-                </span>
-                <button class="delete">
-                    <i class="far fa-trash-alt"></i>
-                </button>
-            </div>
-        `;
-
-        var current_tasks = document.querySelectorAll(".delete");
-        for(var i=0; i<current_tasks.length; i++){
-            current_tasks[i].onclick = function(){
-                this.parentNode.remove();
-            }
-        }
-
-        var tasks = document.querySelectorAll(".task");
-        for(var i=0; i<tasks.length; i++){
-            tasks[i].onclick = function(){
-                this.classList.toggle('completed');
-            }
-        }
-
-        document.querySelector("#newtask input").value = "";
-    }
-}
-
-
-var currentMode = '{{leg_data.MODE}}';
-console.log( currentMode );
-
-if (currentMode === 'None') { currentMode = 'Four'; }
-console.log( currentMode );
-
-$('#Four').prop('checked', currentMode === 'Four');
-$('#Eight').prop('checked', currentMode === 'Eight');
-
-
-function handleClick(myRadio) {
-    currentMode = myRadio.value;
-    console.log( currentMode );
-
-    $('#MODE_FORM').append('<input type="hidden" name="servo_mode" value="' + currentMode + '" />') // $("input[name=mode]").val() + '" />');
-    
-
-    $("#MODE_FORM").submit();
-    //TELL BACKEND
-
-};
 
 // some data to be plotted
 var x_data = {{leg_data.x}};
@@ -708,156 +97,15 @@ var y_data_3 = {{leg_data.back_right}};
 var y_data_4 = {{leg_data.back_left}};
 var MOTION = '{{leg_data.MOTION}}';
 
-$("#saveName").val(MOTION);
-$("#loadName").val(MOTION);
-$("#addMotion").val(MOTION);
 
-
-var RANGE = {{leg_data.RANGE}};
-var TIMES_VAL = {{leg_data.TIMES_VAL}};
-var DELAY_VAL = {{leg_data.DELAY_VAL}};
-var SHIFT_VAL = {{leg_data.SHIFT_VAL}};
-var CAMERA_REFRESH = {{leg_data.CAMERA}};
-
-
-var FORWARD_VAL = "{{leg_data.FORWARD}}";
-var BACKWARDS_VAL = "{{leg_data.BACKWARDS}}";
-var LEFT_VAL = "{{leg_data.LEFT}}";
-var RIGHT_VAL = "{{leg_data.RIGHT}}";
-
-
-var fr_last_adjuster_value = 0;
-var fl_last_adjuster_value = 0;
-var br_last_adjuster_value = 0;
-var bl_last_adjuster_value = 0;
-
-var fr_adjuster_value = 0;
-var fl_adjuster_value = 0;
-var br_adjuster_value = 0;
-var bl_adjuster_value = 0;
-
-var fr_last_phase_value = 0;
-var fl_last_phase_value = 0;
-var br_last_phase_value = 0;
-var bl_last_phase_value = 0;
-
-var fr_phase_value = 0;
-var fl_phase_value = 0;
-var br_phase_value = 0;
-var bl_phase_value = 0;
-
-//var fr_last_amp_value = 0;
-//var fl_last_amp_value = 0;
-//var br_last_amp_value = 0;
-//var bl_last_amp_value = 0;
-
-var fr_amp_value = 0;
-var fl_amp_value = 0;
-var br_amp_value = 0;
-var bl_amp_value = 0;
-
-var front_right_last_adjuster_value = {{leg_data.fr_adjust}};
-var front_left_last_adjuster_value = {{leg_data.fl_adjust}};
-var back_right_last_adjuster_value = {{leg_data.br_adjust}};
-var back_left_last_adjuster_value = {{leg_data.bl_adjust}};
-
-var front_right_adjuster_value = front_right_last_adjuster_value;
-var front_left_adjuster_value = front_left_last_adjuster_value;
-var back_right_adjuster_value = back_right_last_adjuster_value;
-var back_left_adjuster_value = back_left_last_adjuster_value;
-
+var RANGE = 15;
+var TIMES_VAL = 5;
+var DELAY_VAL = 0.005;
 
 document.getElementById("MOTION").innerHTML=String(MOTION); 
-document.getElementById("WIDTH").innerHTML=String( RANGE); 
-document.getElementById("TIMES").innerHTML=String( TIMES_VAL); 
-document.getElementById("DELAY").innerHTML=String( DELAY_VAL); 
-document.getElementById("SHIFT").innerHTML=String( SHIFT_VAL); 
-
-document.getElementById("FORWARD").innerHTML=String(FORWARD_VAL); 
-document.getElementById("BACKWARDS").innerHTML=String(BACKWARDS_VAL); 
-document.getElementById("LEFT").innerHTML=String(LEFT_VAL); 
-document.getElementById("RIGHT").innerHTML=String(RIGHT_VAL); 
-
-document.getElementById("front_right_adjust").innerHTML=String( front_right_adjuster_value); 
-document.getElementById("front_left_adjust").innerHTML=String( front_left_adjuster_value); 
-document.getElementById("back_right_adjust").innerHTML=String( back_right_adjuster_value); 
-document.getElementById("back_left_adjust").innerHTML=String( back_left_adjuster_value); 
-
-document.getElementById("front_right_slider").value=front_right_adjuster_value; 
-document.getElementById("front_left_slider").value=front_left_adjuster_value; 
-document.getElementById("back_right_slider").value=back_right_adjuster_value; 
-document.getElementById("back_left_slider").value=back_left_adjuster_value; 
-
-
-
-
-
-// UI only
-function vflip(dataset_ndx) {
-
-   for(var i=0; i<myChart.data.datasets[dataset_ndx].data.length; i++) {
-   	myChart.data.datasets[dataset_ndx].data[i] = 180 - myChart.data.datasets[dataset_ndx].data[i] ;
-   }
-        window.myChart.update();
-
-};
-
-function hflip(dataset_ndx) {
-
-    myChart.data.datasets[dataset_ndx].data.reverse() ;
-    window.myChart.update();
-
-};
-
-
-
-
-
-function setEdgesToNinety(event) {
- 
-
-   RANGE = document.getElementById("points").value;
-   
-   for(var datasetIndex=0; datasetIndex<myChart.data.datasets.length; datasetIndex++) {
-    var dataset = myChart.data.datasets[datasetIndex].data;
-    var len = dataset.length;
-    
-    //limit length to 131 (arbitrary, yes)
-    if (len > 131) {dataset = dataset.slice(0,131)}
-    
-    len = dataset.length;
-    
-    myChart.data.datasets[datasetIndex].data[0] = 90 ;
-    myChart.data.datasets[datasetIndex].data[len - 1] = 90 ;
-
-    var s = Smooth(
-		[
-		myChart.data.datasets[datasetIndex].data[0],
-		myChart.data.datasets[datasetIndex].data[RANGE],
-		myChart.data.datasets[datasetIndex].data[RANGE*2]
-                ]);
-           
-    for (var n = 0; n < RANGE*2; n++)
-    {
-       myChart.data.datasets[datasetIndex].data[n] = s(parseFloat(n * divideIfNotZero(1,RANGE)));
-    }
-           
-    var s2 = Smooth(
-		[
-		myChart.data.datasets[datasetIndex].data[len - 1 - RANGE*2],
-		myChart.data.datasets[datasetIndex].data[len - 1 - RANGE],
-		myChart.data.datasets[datasetIndex].data[len - 1]
-		]);          
-
-    for (var ndx = 0; ndx < 2*RANGE; ndx++)
-    {
-       myChart.data.datasets[datasetIndex].data[len - 1 - RANGE*2 + ndx] = s2(parseFloat(ndx*divideIfNotZero(1,RANGE)));
-    }
-   
-   }
-   window.myChart.update();
-}
-
+document.getElementById("WIDTH").innerHTML=String(RANGE); 
+document.getElementById("TIMES").innerHTML=String(TIMES_VAL); 
+document.getElementById("DELAY").innerHTML=String(DELAY_VAL); 
 
 // UI only
 function changeRange(event) {
@@ -865,338 +113,7 @@ function changeRange(event) {
    document.getElementById("WIDTH").innerHTML=String(RANGE); 
 
 };
-
-
-// UI only
-function changeShiftView(event) {
-   SHIFT_VAL = document.getElementById("shiftSlider").value;
-   document.getElementById("SHIFT").innerHTML=String(SHIFT_VAL); 
-}
-
-//generic shifting all visible datasets
-function changeShift(event) {
-   changeShiftView(event);
-   for(var i=0; i<myChart.data.datasets.length; i++) {
-     ARRLEN = myChart.data.datasets[i].data.length;
-    if (myChart.isDatasetVisible(i)) {
-        for (var j=0; j<ARRLEN; j++) {
-            console.log( myChart.data.datasets[i].data[j]);
-            myChart.data.datasets[i].data[j] = myChart.data.datasets[i].data[j] + parseFloat(SHIFT_VAL);
-        }
-    }
-   }
-   // See console.
-   window.myChart.update();
-};
-
-
-<!---------------------------------------------->
-function FRPhase(event) {
-   fr_phase_value = document.getElementById("phaseFR").value;
-   var total_shift = - parseFloat(fr_last_phase_value) + parseFloat(fr_phase_value);
-   var is_negative = fr_phase_value < fr_last_phase_value;
-   if (is_negative)
-   {
-      for (var j=0; j>total_shift; j--) {
-	myChart.data.datasets[0].data.push( myChart.data.datasets[0].data.shift() );
-      }
-   }
-   else
-   {
-      for (var j=0; j<total_shift; j++) {
-	myChart.data.datasets[0].data.unshift( myChart.data.datasets[0].data.pop() );
-      }
-
-   }
-
-   fr_last_phase_value = fr_phase_value;
-   window.myChart.update();
-
-};
-
-function FLPhase(event) {
-   fl_phase_value = document.getElementById("phaseFL").value;
-   var total_shift = - parseFloat(fl_last_phase_value) + parseFloat(fl_phase_value);
-   var is_negative = fl_phase_value < fl_last_phase_value;
-   if (is_negative)
-   {
-      for (var j=0; j>total_shift; j--) {
-	myChart.data.datasets[1].data.push( myChart.data.datasets[1].data.shift() );
-      }
-   }
-   else
-   {
-      for (var j=0; j<total_shift; j++) {
-	myChart.data.datasets[1].data.unshift( myChart.data.datasets[1].data.pop() );
-      }
-
-   }
-   
-   fl_last_phase_value = fl_phase_value;
-   window.myChart.update();
-};
-
-function BRPhase(event) {
-   br_phase_value = document.getElementById("phaseBR").value;
-   var total_shift = - parseFloat(br_last_phase_value) + parseFloat(br_phase_value);
-   var is_negative = br_phase_value < br_last_phase_value;
-   if (is_negative)
-   {
-      for (var j=0; j>total_shift; j--) {
-	myChart.data.datasets[2].data.push( myChart.data.datasets[2].data.shift() );
-      }
-   }
-   else
-   {
-      for (var j=0; j<total_shift; j++) {
-	myChart.data.datasets[2].data.unshift( myChart.data.datasets[2].data.pop() );
-      }
-   }
-
-   br_last_phase_value = br_phase_value;
-   window.myChart.update();
-};
-
-
-function BLPhase(event) {
-   bl_phase_value = document.getElementById("phaseBL").value;
-   var total_shift = - parseFloat(bl_last_phase_value) + parseFloat(bl_phase_value);
-   var is_negative = bl_phase_value < bl_last_phase_value;
-   if (is_negative)
-   {
-      for (var j=0; j>total_shift; j--) {
-	myChart.data.datasets[3].data.push( myChart.data.datasets[3].data.shift() );
-      }
-   }
-   else
-   {
-      for (var j=0; j<total_shift; j++) {
-	myChart.data.datasets[3].data.unshift( myChart.data.datasets[3].data.pop() );
-      }
-   }
-
-   bl_last_phase_value = bl_phase_value;
-   window.myChart.update();
-
-};
-
-<!---------------------------------------------->
-function FRShift(event) {
-   fr_adjuster_value = document.getElementById("shiftFR").value;
-   ARRLEN = myChart.data.datasets[0].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-      myChart.data.datasets[0].data[j] = myChart.data.datasets[0].data[j] - parseFloat(fr_last_adjuster_value) + parseFloat(fr_adjuster_value);
-   }
-   fr_last_adjuster_value = fr_adjuster_value;
-   window.myChart.update();
-
-};
-
-function FLShift(event) {
-   fl_adjuster_value = document.getElementById("shiftFL").value;
-   ARRLEN = myChart.data.datasets[1].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-       myChart.data.datasets[1].data[j] = myChart.data.datasets[1].data[j] - parseFloat(fl_last_adjuster_value) + parseFloat(fl_adjuster_value);
-   }
-   fl_last_adjuster_value = fl_adjuster_value;
-   window.myChart.update();
-};
-
-function BRShift(event) {
-   br_adjuster_value = document.getElementById("shiftBR").value;
-   ARRLEN = myChart.data.datasets[2].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-      myChart.data.datasets[2].data[j] = myChart.data.datasets[2].data[j] - parseFloat(br_last_adjuster_value) + parseFloat(br_adjuster_value);
-   }
-   br_last_adjuster_value = br_adjuster_value;
-   window.myChart.update();
-};
-
-
-function BLShift(event) {
-   bl_adjuster_value = document.getElementById("shiftBL").value;
-   ARRLEN = myChart.data.datasets[3].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-      myChart.data.datasets[3].data[j] = myChart.data.datasets[3].data[j] - parseFloat(bl_last_adjuster_value) + parseFloat(bl_adjuster_value);
-   }
-   bl_last_adjuster_value = bl_adjuster_value;
-   window.myChart.update();
-};
-
-
-
-
-<!---------------------------------------------->
-function FRAmp(event) {
-   fr_amp_value = document.getElementById("ampFR").value;
-   ARRLEN = myChart.data.datasets[0].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-	myChart.data.datasets[0].data[j] = 90 + ( myChart.data.datasets[0].data[j] - 90) * parseFloat(fr_amp_value);
-   }
-   //fr_last_amp_value = fr_amp_value;
-   window.myChart.update();
-};
-
-function FLAmp(event) {
-   fl_amp_value = document.getElementById("ampFL").value;
-   ARRLEN = myChart.data.datasets[1].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-	myChart.data.datasets[1].data[j] = 90 + ( myChart.data.datasets[1].data[j] - 90) * parseFloat(fl_amp_value);
-   }
-   //fr_last_amp_value = fr_amp_value;
-   window.myChart.update();
-};
-
-function BRAmp(event) {
-   br_amp_value = document.getElementById("ampBR").value;
-   ARRLEN = myChart.data.datasets[2].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-	myChart.data.datasets[2].data[j] = 90 + ( myChart.data.datasets[2].data[j] - 90) * parseFloat(br_amp_value);
-   }
-   //fr_last_amp_value = fr_amp_value;
-   window.myChart.update();
-};
-
-function BLAmp(event) {
-   bl_amp_value = document.getElementById("ampBL").value;
-   ARRLEN = myChart.data.datasets[3].data.length;
-   for (var j=0; j<ARRLEN; j++) {
-	myChart.data.datasets[3].data[j] = 90 + ( myChart.data.datasets[3].data[j] - 90) * parseFloat(bl_amp_value);
-   }
-   //fr_last_amp_value = fr_amp_value;
-   window.myChart.update();
-};
-
-
-
-
-
-
-
-function changeFRShift(event) {
-   front_right_adjuster_value = document.getElementById("front_right_slider").value;
-   document.getElementById("front_right_adjust").innerHTML=String(front_right_adjuster_value); 
-   front_right_last_adjuster_value = front_right_adjuster_value;
-
-   var saveData = [{"fr":front_right_adjuster_value}];
-
-   $.ajax({
-     type: "POST",
-     url: "/setfr",
-     data: JSON.stringify(saveData),
-     contentType: "application/json",
-     dataType: 'json',
-     success: function(result) {
-       console.log(result);
-     }
-   });
-};
-
-function changeFLShift(event) {
-   front_left_adjuster_value = document.getElementById("front_left_slider").value;
-   document.getElementById("front_left_adjust").innerHTML=String(front_left_adjuster_value); 
-   front_left_last_adjuster_value = front_left_adjuster_value;
-   
-   var saveData = [{"fl":front_left_adjuster_value}];
-
-   $.ajax({
-     type: "POST",
-     url: "/setfl",
-     data: JSON.stringify(saveData),
-     contentType: "application/json",
-     dataType: 'json',
-     success: function(result) {
-       console.log(result);
-     }
-   });
-};
-
-function changeBRShift(event) {
-   back_right_adjuster_value = document.getElementById("back_right_slider").value;
-   document.getElementById("back_right_adjust").innerHTML=String(back_right_adjuster_value); 
-   back_right_last_adjuster_value = back_right_adjuster_value;
-   
-   var saveData = [{"br":back_right_adjuster_value}];
-
-   $.ajax({
-     type: "POST",
-     url: "/setbr",
-     data: JSON.stringify(saveData),
-     contentType: "application/json",
-     dataType: 'json',
-     success: function(result) {
-       console.log(result);
-     }
-   });
-};
-
-function changeBLShift(event) {
-   back_left_adjuster_value = document.getElementById("back_left_slider").value;
-   document.getElementById("back_left_adjust").innerHTML=String(back_left_adjuster_value); 
-   back_left_last_adjuster_value = back_left_adjuster_value;
-
-   var saveData = [{"bl":back_left_adjuster_value}];
-
-   $.ajax({
-     type: "POST",
-     url: "/setbl",
-     data: JSON.stringify(saveData),
-     contentType: "application/json",
-     dataType: 'json',
-     success: function(result) {
-       console.log(result);
-     }
-   });
-};
-
-
-function flipper() {
-    vflip(0); vflip(1); vflip(2); vflip(3);
-    hflip(0); hflip(1); hflip(2); hflip(3);
-
-
-}
-
-function shuffleServos() {
-   
-    front_right_original_value = myChart.data.datasets[0];
-    front_left_original_value = myChart.data.datasets[1];
-    back_right_original_value = myChart.data.datasets[2];
-    back_left_original_value = myChart.data.datasets[3];
-    var a = [front_right_original_value.data, front_left_original_value.data, back_right_original_value.data, back_left_original_value.data];
-    a = shuffle(a);
-
-    myChart.data.datasets[0].data = a[0];
-    myChart.data.datasets[1].data = a[1];
-    myChart.data.datasets[2].data = a[2];
-    myChart.data.datasets[3].data = a[3];
-
-   window.myChart.update();
-
-}
-
-
-
-function shuffle(array) {
-  var m = array.length, t, i;
-
-  // While there remain elements to shuffle…
-  while (m) {
-
-    // Pick a remaining element…
-    i = Math.floor(Math.random() * m--);
-
-    // And swap it with the current element.
-    t = array[m];
-    array[m] = array[i];
-    array[i] = t;
-  }
-
-  return array;
-} 
-
-
-
+ 
 //TELL BACKEND
 function changeRepeat(event) {
    TIMES_VAL = document.getElementById("repeatSlider").value;
@@ -1310,18 +227,6 @@ window.onload = function () {
     canvas.onpointerdown = down_handler;
     canvas.onpointerup = up_handler;
     canvas.onpointermove = null;
-
-    // set original values
-    front_right_original_value = myChart.data.datasets[0].data[0];
-    front_left_original_value = myChart.data.datasets[1].data[0];
-    back_right_original_value = myChart.data.datasets[2].data[0];
-    back_left_original_value = myChart.data.datasets[3].data[0];
-    
-    console.log(front_right_original_value);
-    console.log(front_left_original_value);
-    console.log(back_right_original_value);
-    console.log(back_left_original_value);
-
 };
 
 function down_handler(event) {
@@ -1387,12 +292,16 @@ function move_handler(event)
            for (var n = 0; n < activePoint._index*2; n++)
            {
 	       data.datasets[datasetIndex].data[n] = s(parseFloat(n * divideIfNotZero(1,activePoint._index)));
+               console.log(parseFloat(n* divideIfNotZero(1, activePoint._index)));
            }
 
         }
         else if (activePoint._index >= ARRLEN - RANGE)
         {
 
+           console.log(ARRLEN - RANGE);
+           console.log(activePoint._index);
+           console.log(ARRLEN - 1);
            var s = Smooth(
                 [
                 data.datasets[datasetIndex].data[ARRLEN - RANGE],
@@ -1403,12 +312,16 @@ function move_handler(event)
            for (var n = 0; n < ARRLEN - activePoint._index; n++)
            {
                data.datasets[datasetIndex].data[ARRLEN - n] = s(parseFloat(n * divideIfNotZero(1, ARRLEN - activePoint._index)));
+               console.log(parseFloat(n* divideIfNotZero(1, ARRLEN - activePoint._index)));
            }
 
 
         }
         else {
 
+           console.log(activePoint._index - RANGE);
+           console.log(activePoint._index);
+           console.log(activePoint._index + RANGE);
            var s = Smooth(
 		[
 		data.datasets[datasetIndex].data[activePoint._index - RANGE],
@@ -1419,19 +332,9 @@ function move_handler(event)
            for (var ndx = 0; ndx < 2*RANGE; ndx++)
            {
               data.datasets[datasetIndex].data[activePoint._index - RANGE + ndx] = s(parseFloat(ndx*divideIfNotZero(1,RANGE)));
+              console.log(parseFloat(ndx*divideIfNotZero(1,RANGE)));
            }
         }
-
-
-	//sanity check, fix smooth weirdness adding beyond end
-        for(var datasetIndex=0; datasetIndex<myChart.data.datasets.length; datasetIndex++) {
-           var dataset = myChart.data.datasets[datasetIndex].data;
-           var len = dataset.length;
-    
-           //limit length to 131 (arbitrary, yes)
-           if (len > 131) {dataset = dataset.slice(0,131)}
-        }
-
         window.myChart.update();
     };
 };
@@ -1457,25 +360,21 @@ $("#container").on(
         "select_node.jstree", function(evt, data){
             $("#saveName").val(data.node.id);
             $("#loadName").val(data.node.id);
-            $("#addMotion").val(data.node.id);
-
         }
 );
 
 
 
 function load() {
+ //var loadData = [{"id": $('#container').jstree('get_selected')}];
+ //if (loadData === undefined) {return;}
 
- var selected = $('#container').jstree('get_selected');
-  if (!selected || selected.length == null || selected.length == 0) { selected = $("#loadName").val(); }
-
- console.log(selected)
- $('#LOAD').append('<input type="hidden" name="id" value="' + selected + '"/>');
+ $('#LOAD').append('<input type="hidden" name="id" value="' +  $('#container').jstree('get_selected') + '" />');
  $("#LOAD").submit();
-};
+}
 
 
-function runadjusted() {
+function run() {
  var saveData = [{"front_right":datasetValues.data.datasets[0].data},
                  {"front_left":datasetValues.data.datasets[1].data},
                  {"back_right":datasetValues.data.datasets[2].data},
@@ -1484,24 +383,7 @@ function runadjusted() {
 
  $.ajax({
    type: "POST",
-   url: "/runadjustedmotion",
-   data: JSON.stringify(saveData),
-   contentType: "application/json",
-   dataType: 'json',
-   success: function(result) {
-     console.log(result);
-   }
- });
-}
-
-
-function settoadjusters() {
-
- var saveData = [{}];
-
- $.ajax({
-   type: "POST",
-   url: "/settoadjusters",
+   url: "/runmotion",
    data: JSON.stringify(saveData),
    contentType: "application/json",
    dataType: 'json',
@@ -1542,125 +424,16 @@ $(function () {
 				return { 'id' : node.id };
 			}
 		}
-	},   
-	'contextmenu' : {
-			'items' : customMenu
-        },
-	'plugins' : ["wholerow", "contextmenu"]
-    }
-	).bind("dblclick.jstree", function (event) {
-             var node = $(event.target).closest("li");
-	     var data = node.data("jstree");
-	     console.log(node);
-	     console.log(data);
-             load();
-	})
+	}});
 });
 
-//Add right click context menu to set default direction motions
-function customMenu(node) {
-    var items = {
-        forwardItem: { 
-            label: "Set FORWARD",
-            _name:node,
-            action: function (node) {
-	        var data = node.item._name.text;
-                document.getElementById("FORWARD").innerHTML=String(data); 
-
-			    var saveData = [{"data":data}];
-            
-                $.ajax({
-                  type: "POST",
-                  url: "/updateForward",
-                  data: JSON.stringify(saveData),
-                  contentType: "application/json",
-                  dataType: 'json',
-                  success: function(result) {
-                    console.log(result);
-                  }
-                });
-            
-	    }
-        },
-        backItem: { 
-            label: "Set BACK",
-            _name:node,
-            action: function (node) {
-	        var data = node.item._name.text;
-                document.getElementById("BACKWARDS").innerHTML=String(data); 
-		
-			    var saveData = [{"data":data}];
-            
-                $.ajax({
-                  type: "POST",
-                  url: "/updateBackwards",
-                  data: JSON.stringify(saveData),
-                  contentType: "application/json",
-                  dataType: 'json',
-                  success: function(result) {
-                    console.log(result);
-                  }
-                });
-            
-	    }
-        },
-        leftItem: { 
-            label: "Set LEFT",
-            _name:node,
-            action: function (node) {
-	        var data = node.item._name.text;
-                document.getElementById("LEFT").innerHTML=String(data); 
-	        
-			    var saveData = [{"data":data}];
-            
-                $.ajax({
-                  type: "POST",
-                  url: "/updateLeft",
-                  data: JSON.stringify(saveData),
-                  contentType: "application/json",
-                  dataType: 'json',
-                  success: function(result) {
-                    console.log(result);
-                  }
-                });
-            
-	    }
-        },
-        rightItem: { 
-            label: "Set RIGHT",
-            _name:node,
-            action: function (node) {
-	        var data = node.item._name.text;
-                document.getElementById("RIGHT").innerHTML=String(data); 
-		
-			    var saveData = [{"data":data}];
-            
-                $.ajax({
-                  type: "POST",
-                  url: "/updateRight",
-                  data: JSON.stringify(saveData),
-                  contentType: "application/json",
-                  dataType: 'json',
-                  success: function(result) {
-                    console.log(result);
-                  }
-                });
-            
-	    }
-        }
-
-	
-    };
 
 
-    return items;
-}
-
-
-</script>
+</script>       
 
 
 
-</body>
+   
+  </body>
 
 </html>
