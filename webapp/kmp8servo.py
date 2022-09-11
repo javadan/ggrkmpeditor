@@ -28,7 +28,6 @@ import io
 from time import strftime, sleep
 import time
 
-import picamera
 
 async_mode = None
 app = Flask(__name__)
@@ -46,23 +45,130 @@ stop_robot_event = Event()
 
 
 
-is_robot = config.settings['robot']
+is_pca9685_robot = config.settings['pca9685_robot']
+is_scservo_robot = config.settings['scservo_robot'] # < for Feetech Smart bus servos (SMT, RS485)
 has_lidar = config.settings['lidar']
 has_arduino_at_115200 = config.settings['arduino_115200']
 has_realsense = config.settings['realsense']
 realsense_url = config.settings['realsense_url']
+has_picamera = config.settings['picamera']
 
-print('Robot:', is_robot)
+print('PCA9685 Robot:', is_pca9685_robot)
+print('SCServo Robot:',  is_scservo_robot)
 print('Lidar:',  has_lidar)
 print('Arduino:',  has_arduino_at_115200)
 print('Realsense:',  has_realsense)
 print('Realsense URL:',  realsense_url)
-    
-if is_robot:
+print('Has picamera (Legacy RPi 32 bit):',  has_picamera)
+
+
+if has_picamera:
+    import picamera
+
+
+if is_pca9685_robot:
     from adafruit_motor import servo
     from adafruit_pca9685 import PCA9685
     from board import SCL, SDA
     import busio
+
+elif is_scservo_robot:
+    import serial
+    from scservo_sdk import *            
+
+    def pingServo(SCS_ID):
+        # Get SCServo model number
+        scs_model_number, scs_comm_result, scs_error = packetHandler.ping(portHandler, SCS_ID)
+        if scs_comm_result != COMM_SUCCESS:
+            print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+        elif scs_error != 0:
+            print("%s" % packetHandler.getRxPacketError(scs_error))
+        else:
+            print("[ID:%03d] ping Succeeded. SCServo model number : %d" % (SCS_ID, scs_model_number))
+        
+    def remap(x, in_min, in_max, out_min, out_max):
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+            
+    #The SC Servos range up to 4096, with 2048 being in the middle 
+    #For us, with 180 degree servos, 1024 might be the middle.  
+    
+    # Control table address
+    ADDR_SCS_TORQUE_ENABLE     = 40
+    ADDR_STS_GOAL_ACC          = 41
+    ADDR_STS_GOAL_POSITION     = 42
+    ADDR_STS_GOAL_SPEED        = 46
+    ADDR_STS_PRESENT_POSITION  = 56
+    
+    # Default setting
+    SCS1_ID                     = 1                 
+    SCS2_ID                     = 2                 
+    SCS3_ID                     = 3                 
+    SCS4_ID                     = 4                 
+    BAUDRATE                    = 115200           
+    DEVICENAME                  = '/dev/ttyUSB0'    
+                                                    
+    
+    SCS_MINIMUM_POSITION_VALUE  = 1536               
+    SCS_MAXIMUM_POSITION_VALUE  = 2560
+    
+    SCS_MOVING_STATUS_THRESHOLD = 10                # SCServo moving status threshold
+    SCS_MOVING_SPEED            = 0                 # SCServo moving speed
+    SCS_MOVING_ACC              = 0                 # SCServo moving acc
+    protocol_end                = 0                 # SCServo bit end(STS/SMS=0, SCS=1)
+    
+
+    portHandler = PortHandler(DEVICENAME)
+    packetHandler = PacketHandler(protocol_end)
+    groupSyncWrite = GroupSyncWrite(portHandler, packetHandler, ADDR_STS_GOAL_POSITION, 2)
+    groupSyncRead = GroupSyncRead(portHandler, packetHandler, ADDR_STS_PRESENT_POSITION, 4)
+    
+    # Open port
+    if portHandler.openPort():
+        print("Succeeded to open the port")
+    else:
+        print("Failed to open the port")
+        quit()
+    
+    
+    # Set port baudrate
+    if portHandler.setBaudRate(BAUDRATE):
+        print("Succeeded to change the baudrate")
+    else:
+        print("Failed to change the baudrate")
+        quit()
+
+
+    # Add parameter storage for SCServo#1 present position value
+    scs_addparam_result = groupSyncRead.addParam(SCS1_ID)
+    if scs_addparam_result != True:
+        print("[ID:%03d] groupSyncRead addparam failed" % SCS1_ID)
+        quit()
+    
+    # Add parameter storage for SCServo#2 present position value
+    scs_addparam_result = groupSyncRead.addParam(SCS2_ID)
+    if scs_addparam_result != True:
+        print("[ID:%03d] groupSyncRead addparam failed" % SCS2_ID)
+        quit()
+
+    # Add parameter storage for SCServo#3 present position value
+    scs_addparam_result = groupSyncRead.addParam(SCS3_ID)
+    if scs_addparam_result != True:
+        print("[ID:%03d] groupSyncRead addparam failed" % SCS3_ID)
+        quit()
+    
+    # Add parameter storage for SCServo#4 present position value
+    scs_addparam_result = groupSyncRead.addParam(SCS4_ID)
+    if scs_addparam_result != True:
+        print("[ID:%03d] groupSyncRead addparam failed" % SCS4_ID)
+        quit()
+
+    
+    # Get SCServo model number
+    pingServo(SCS1_ID) 
+    pingServo(SCS2_ID) 
+    pingServo(SCS3_ID) 
+    pingServo(SCS4_ID) 
+
     
 if has_lidar:
     from adafruit_rplidar import RPLidar
@@ -151,29 +257,28 @@ if has_lidar:
     
 if has_arduino_at_115200:
     ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-    
-    
-def poll_arduino():
-    try:
-       ser.write(str.encode('1'))
-    
-       time.sleep(0.1)
-    
-       read_serial = ser.readline()
-    
-       read_json = json.loads(read_serial.decode())
-       print (read_json)
-       return read_json
-    except Exception as e:
-        print(e)
-    
+        
+        
+    def poll_arduino():
+        try:
+           ser.write(str.encode('1'))
+        
+           time.sleep(0.1)
+        
+           read_serial = ser.readline()
+        
+           read_json = json.loads(read_serial.decode())
+           print (read_json)
+           return read_json
+        except Exception as e:
+            print(e)
+        
      
-if has_arduino_at_115200:
     poll_arduino()
     
     
     
-if is_robot:
+if is_pca9685_robot:
     i2c = busio.I2C(SCL, SDA)
     
     pca = PCA9685(i2c)
@@ -211,6 +316,9 @@ def poll_realsense():
 
 
 
+
+
+
 four_servo_mode = True
     
 ####################
@@ -222,16 +330,36 @@ SHIFT_VAL = 0
 CAMERA = 1
 
 
+def shutdown_scservo(SC_ID):
+
+        # SCServo#1 torque
+        scs_comm_result, scs_error = packetHandler.write1ByteTxRx(portHandler, SC_ID, ADDR_SCS_TORQUE_ENABLE, 0)
+        if scs_comm_result != COMM_SUCCESS:
+            print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+        elif scs_error != 0:
+            print("%s" % packetHandler.getRxPacketError(scs_error))
+        
 
 #####################
 def close_running_threads():
-    if is_robot:
+    if is_pca9685_robot:
         pca.deinit()
     if has_lidar:
         lidar.stop()
         lidar.stop_motor()
         lidar.disconnect()
         #client.close()
+    if is_scservo_robot:
+        # Clear syncread parameter storage
+        groupSyncRead.clearParam()
+        
+        shutdown_scservo(SCS1_ID)
+        shutdown_scservo(SCS2_ID)
+        shutdown_scservo(SCS3_ID)
+        shutdown_scservo(SCS4_ID)
+        
+        # Close port
+        portHandler.closePort()
 
 #Register the function to be called on exit
 atexit.register(close_running_threads)
@@ -242,11 +370,15 @@ atexit.register(close_running_threads)
 
 @socketio.event
 def connect():
-    global thread
-    with thread_lock:
-        if thread is None:
-            thread = socketio.start_background_task(background_lidar_thread)
-    emit('server_info', {'data': 'Connected!'})
+    if has_lidar:
+        global thread
+        with thread_lock:
+            if thread is None:
+                thread = socketio.start_background_task(background_lidar_thread)
+        emit('server_info', {'data': 'Connected!'})
+    else:
+        emit('server_info', {'data': '... No Lidar Connected.'})
+
 
 
 @socketio.event
@@ -269,6 +401,10 @@ def index():
 
     if 'CAMERA' not in session:
         session['CAMERA'] = 1
+
+    if not has_picamera:
+        session['CAMERA'] = 0
+
 
     if 'MOTION' not in session:
         session['MOTION'] = 'walk'
@@ -336,7 +472,7 @@ def index():
     except:
         print("ERROR:Missing defaults file?")
 
-    #set some defaulrs
+    #set some defaults
     try:
         four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
         if session['MODE'] is None:
@@ -433,11 +569,19 @@ def index():
 
 
 
+def setSCServoPosition(SCS_ID, servo_angle):
+    print("Setting Position ", SCS_ID, " to ", servo_angle)
+    param_goal_position = [SCS_LOBYTE(servo_angle), SCS_HIBYTE(servo_angle)]
+
+    scs_addparam_result = groupSyncWrite.addParam(SCS_ID, param_goal_position)
+    if scs_addparam_result != True:
+        print("[ID:%03d] groupSyncWrite addparam failed" % SCS_ID)
+        quit()
 
 
 @app.route('/settoadjusters', methods=['POST', 'GET'])
 def settoadjusters():
-    if is_robot:
+    if is_pca9685_robot:
         servo0.angle = 90 + session['front_right_adjuster']
         servo1.angle = 90 - session['front_left_adjuster']
         servo2.angle = 90 + session['back_right_adjuster']
@@ -447,6 +591,26 @@ def settoadjusters():
         servo6.angle = 90
         servo7.angle = 90
 
+    if is_scservo_robot:
+                
+        servo0_angle = int(remap(90 + int(session['front_right_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+        servo1_angle = int(remap(90 - int(session['front_left_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+        servo2_angle = int(remap(90 + int(session['back_right_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+        servo3_angle = int(remap(90 - int(session['back_left_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+       
+        setSCServoPosition(1, servo0_angle)
+        setSCServoPosition(2, servo1_angle)
+        setSCServoPosition(3, servo2_angle)
+        setSCServoPosition(4, servo3_angle)
+        
+        # Syncwrite goal position
+        scs_comm_result = groupSyncWrite.txPacket()
+        if scs_comm_result != COMM_SUCCESS:
+            print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+                
+                # Clear syncwrite parameter storage
+        groupSyncWrite.clearParam()
+             
     results = {'processed': 'true'}
     return jsonify(results)
 
@@ -456,7 +620,7 @@ def stop():
 
     stop_robot_event.set()
 
-    if is_robot:
+    if is_pca9685_robot:
         servo0.angle = 90
         servo1.angle = 90
         servo2.angle = 90
@@ -465,6 +629,21 @@ def stop():
         servo5.angle = 90
         servo6.angle = 90
         servo7.angle = 90
+    elif is_scservo_robot:
+
+        setSCServoPosition(1, 2048)
+        setSCServoPosition(2, 2048)
+        setSCServoPosition(3, 2048)
+        setSCServoPosition(4, 2048)
+        
+        # Syncwrite goal position
+        scs_comm_result = groupSyncWrite.txPacket()
+        if scs_comm_result != COMM_SUCCESS:
+            print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+                
+                # Clear syncwrite parameter storage
+        groupSyncWrite.clearParam()
+
 
     results = {'processed': 'true'}
     return jsonify(results)
@@ -725,7 +904,8 @@ def getdirs():
     #data = request.get_json()
     #print (data)
     listing = get_directory_listing("./motions")
-    print (jsonify(listing))
+    print("DIRS", listing)
+    print("JSONIFIED:", jsonify(listing))
     return jsonify(listing)
 
 @app.route('/getcombodirs', methods=['POST', 'GET'])
@@ -1008,7 +1188,7 @@ def runBrain():
                 front_left = 180-front_left
                 back_left = 180-back_left
 
-                if is_robot:
+                if is_pca9685_robot:
                     for i in range(len(front_right)):
                         if stop_robot_event.is_set(): 
                             print(f'end {threading.current_thread().name} ')
@@ -1204,7 +1384,15 @@ def runadjustedmotiondirect(data):
         back_right = np.array(back_right) + int(session['back_right_adjuster'])
         back_left = np.array(back_left) + int(session['back_left_adjuster'])
     
-    
+        print(len(front_right), " ",  len(front_left), " ", len(back_right), " ", len(back_left))
+        min_len = min(len(front_right), len(front_left), len(back_right), len(back_left))
+        front_right = front_right[:min_len]
+        front_left = front_left[:min_len]
+        back_right = back_right[:min_len]
+        back_left = back_left[:min_len]
+        print(len(front_right), " ",  len(front_left), " ", len(back_right), " ", len(back_left))
+
+
         if not four_servo_mode:
             gripper_1 = gripper_1_update['gripper_1']
             gripper_2 = gripper_2_update['gripper_2']
@@ -1214,7 +1402,6 @@ def runadjustedmotiondirect(data):
     
        
         NUM_TIMES = int(session['NUM_TIMES'])
-        print(NUM_TIMES)
         r_front_right = np.tile(front_right, NUM_TIMES)
         r_front_left = np.tile(front_left, NUM_TIMES)
         r_back_right = np.tile(back_right, NUM_TIMES)
@@ -1223,7 +1410,8 @@ def runadjustedmotiondirect(data):
         #maybe make these configurable, cause you could set up the servo backwards
         r_front_left = 180-r_front_left
         r_back_left = 180-r_back_left
-    
+   
+        
     
         if not four_servo_mode:
             gripper_1 = np.tile(gripper_1, NUM_TIMES)
@@ -1231,7 +1419,7 @@ def runadjustedmotiondirect(data):
             gripper_3 = np.tile(gripper_3, NUM_TIMES)
             gripper_4 = np.tile(gripper_4, NUM_TIMES)
     
-        if is_robot: 
+        if is_pca9685_robot: 
             for i in range(len(r_front_right)):
                 if stop_robot_event.is_set(): 
                     print(f'end {threading.current_thread().name} ')
@@ -1251,8 +1439,62 @@ def runadjustedmotiondirect(data):
                 DELAY = float(session['DELAY'])
                 time.sleep(DELAY)
 
+
+        elif is_scservo_robot:
+            
+            for index in range(len(r_front_right)):
+                if stop_robot_event.is_set(): 
+                    print(f'end {threading.current_thread().name} ')
+                    return
+   
+                #need to map 0-2048 low and high to 0 to 180
+                
+                servo0_angle = int(remap(int(r_front_right[index]), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+                servo1_angle = int(remap(int(r_front_left[index]), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+                servo2_angle = int(remap(int(r_back_right[index]), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+                servo3_angle = int(remap(int(r_back_left[index]), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
+               
+                param_goal_position_1 = [SCS_LOBYTE(servo0_angle), SCS_HIBYTE(servo0_angle)]
+             
+                scs_addparam_result = groupSyncWrite.addParam(SCS1_ID, param_goal_position_1)
+                if scs_addparam_result != True:
+                    print("[ID:%03d] groupSyncWrite addparam failed" % SCS1_ID)
+                    quit()
+
+                param_goal_position_2 = [SCS_LOBYTE(servo1_angle), SCS_HIBYTE(servo1_angle)]
+
+                scs_addparam_result = groupSyncWrite.addParam(SCS2_ID, param_goal_position_2)
+                if scs_addparam_result != True:
+                    print("[ID:%03d] groupSyncWrite addparam failed" % SCS2_ID)
+                    quit()
+
+                param_goal_position_3 = [SCS_LOBYTE(servo2_angle), SCS_HIBYTE(servo2_angle)]
+
+                scs_addparam_result = groupSyncWrite.addParam(SCS3_ID, param_goal_position_3)
+                if scs_addparam_result != True:
+                    print("[ID:%03d] groupSyncWrite addparam failed" % SCS3_ID)
+                    quit()
+
+                param_goal_position_4 = [SCS_LOBYTE(servo3_angle), SCS_HIBYTE(servo3_angle)]
+
+                scs_addparam_result = groupSyncWrite.addParam(SCS4_ID, param_goal_position_4)
+                if scs_addparam_result != True:
+                    print("[ID:%03d] groupSyncWrite addparam failed" % SCS4_ID)
+                    quit()
+
+                # Syncwrite goal position
+                scs_comm_result = groupSyncWrite.txPacket()
+                if scs_comm_result != COMM_SUCCESS:
+                    print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+                
+                # Clear syncwrite parameter storage
+                groupSyncWrite.clearParam()
+             
+                DELAY = float(session['DELAY'])
+                time.sleep(DELAY)
+
     stop_robot_event.clear()
-    t = Thread(target=runMotionTask, args=(data,), daemon=True)  #check the syntax
+    t = Thread(target=runMotionTask, args=(data,), daemon=True)  
     t.start()
     
     results = {'processed': 'true'}
@@ -1276,7 +1518,8 @@ def get_directory_listing(path):
                 'parent' : '#',
                 'children': [] #get_directory_listing(subpath)
             })
-
+    
+    children = sorted(children, key=lambda d: d['text'])
     return children
 
 
@@ -1284,16 +1527,17 @@ def get_directory_listing(path):
 lastfile = "static/1.jpg"
 
 def save_image():
-    timestr = time.strftime("%Y%m%d-%H%M%S")
-    lastfile = "static/snap_" + timestr + ".jpg"
-    camera = picamera.PiCamera()
-    camera.resolution = (640, 480)
-    camera.start_preview()
-    sleep(2)
-    camera.capture(lastfile)
-    camera.stop_preview()
-    camera.close()
-
+    if has_picamera:
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        lastfile = "static/snap_" + timestr + ".jpg"
+        camera = picamera.PiCamera()
+        camera.resolution = (640, 480)
+        camera.start_preview()
+        sleep(2)
+        camera.capture(lastfile)
+        camera.stop_preview()
+        camera.close()
+    
     return(lastfile)
 
 
@@ -1303,9 +1547,11 @@ def snapshot():
 
 @app.route("/snapshot2")
 def getImage():
-     camera.capture(lastfile)
-     camera.close()
-     return send_file(lastfile)
+    if has_picamera:
+        camera.capture(lastfile)
+        camera.close()
+
+    return send_file(lastfile)
 
 
 

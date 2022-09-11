@@ -20,14 +20,17 @@
             var socket = io.connect('http://'+document.domain+':'+location.port);
             
             socket.on('connect', function() {
-	        console.log("Connected to Lidar");
-                $('#log').append("Connected to LIDAR");
+	        console.log("Connected to Backend");
+                $('#log').append("Connected to Backend");
             });
             // Event handler for new connections.
             // The callback function is invoked when a connection with the
             // server is established.
             socket.on('server_info', function(msg) {
                 $('#log').append(msg.data);
+		if (msg.data === "Disconnected!") {
+		    emit("disconnection_request");
+		}
             });
 
 //            const degrees_to_radians = deg => (deg * Math.PI) / 180.0;
@@ -389,7 +392,7 @@
 	</div>
 	
 	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="front_right_slider" name="front_right_slider" onchange="changeFRShift()">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="front_right_slider" name="front_right_slider" oninput="changeFRShift()" onchange="changeFRShift()">
 	</div>
 				</td>
 				<td>
@@ -398,7 +401,7 @@
 	</div>
 	
 	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="front_left_slider" name="front_left_slider"  onchange="changeFLShift()">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="front_left_slider" name="front_left_slider" oninput="changeFLShift()" onchange="changeFLShift()">
 	</div>
 				</td>
 				<td>
@@ -407,7 +410,7 @@
 	</div>
 	
 	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="back_right_slider" name="back_right_slider" onchange="changeBRShift()">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="back_right_slider" name="back_right_slider" oninput="changeBRShift()" onchange="changeBRShift()">
 	</div>
 	
 				</td>
@@ -417,7 +420,7 @@
 	</div>
 	
 	<div class="slider-wrapper">
-	<input type="range" class="slider" step="1" value="0" min="-50" max="50" id="back_left_slider" name="back_left_slider" onchange="changeBLShift()">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="back_left_slider" name="back_left_slider" oninput="changeBLShift()" onchange="changeBLShift()">
 	</div>
 	
 	
@@ -822,19 +825,20 @@ function setEdgesToNinety(event) {
     var dataset = myChart.data.datasets[datasetIndex].data;
     var len = dataset.length;
     
-    //limit length to 131 (arbitrary, yes)
-    if (len > 131) {dataset = dataset.slice(0,131)}
+    //limit length to 132 (arbitrary, yes)
+    if (len > 132) {dataset = dataset.slice(0,132)}
     
     len = dataset.length;
     
-    myChart.data.datasets[datasetIndex].data[0] = 90 ;
-    myChart.data.datasets[datasetIndex].data[len - 1] = 90 ;
+    
+    dataset[0] = 90 ;
+    dataset[len - 1] = 90 ;
 
     var s = Smooth(
 		[
-		myChart.data.datasets[datasetIndex].data[0],
-		myChart.data.datasets[datasetIndex].data[RANGE],
-		myChart.data.datasets[datasetIndex].data[RANGE*2]
+		dataset[0],
+		dataset[RANGE],
+		dataset[RANGE*2]
                 ]);
            
     for (var n = 0; n < RANGE*2; n++)
@@ -844,15 +848,20 @@ function setEdgesToNinety(event) {
            
     var s2 = Smooth(
 		[
-		myChart.data.datasets[datasetIndex].data[len - 1 - RANGE*2],
-		myChart.data.datasets[datasetIndex].data[len - 1 - RANGE],
-		myChart.data.datasets[datasetIndex].data[len - 1]
+		dataset[len - 1 - RANGE*2],
+		dataset[len - 1 - RANGE],
+		dataset[len - 1]
 		]);          
 
     for (var ndx = 0; ndx < 2*RANGE; ndx++)
     {
        myChart.data.datasets[datasetIndex].data[len - 1 - RANGE*2 + ndx] = s2(parseFloat(ndx*divideIfNotZero(1,RANGE)));
     }
+    
+    len = dataset.length;
+    //limit length to 132 (arbitrary, yes)
+    if (len > 132) {dataset = dataset.slice(0,132);}
+    console.log(dataset.length);
    
    }
    window.myChart.update();
@@ -1428,8 +1437,8 @@ function move_handler(event)
            var dataset = myChart.data.datasets[datasetIndex].data;
            var len = dataset.length;
     
-           //limit length to 131 (arbitrary, yes)
-           if (len > 131) {dataset = dataset.slice(0,131)}
+           //limit length to 132 (arbitrary, yes)
+           if (len > 132) {dataset = dataset.slice(0,132);}
         }
 
         window.myChart.update();
@@ -1443,10 +1452,10 @@ function map(value, start1, stop1, start2, stop2) {
 
 function save() {
 
- $('#SAVE').append('<input type="hidden" name="front_right" value="' + datasetValues.data.datasets[0].data.slice(0,131) + '" />');
- $('#SAVE').append('<input type="hidden" name="front_left" value="' + datasetValues.data.datasets[1].data.slice(0,131) + '" />');
- $('#SAVE').append('<input type="hidden" name="back_right" value="' + datasetValues.data.datasets[2].data.slice(0,131) + '" />');
- $('#SAVE').append('<input type="hidden" name="back_left" value="' + datasetValues.data.datasets[3].data.slice(0,131) + '" />');
+ $('#SAVE').append('<input type="hidden" name="front_right" value="' + datasetValues.data.datasets[0].data.slice(0,132) + '" />');
+ $('#SAVE').append('<input type="hidden" name="front_left" value="' + datasetValues.data.datasets[1].data.slice(0,132) + '" />');
+ $('#SAVE').append('<input type="hidden" name="back_right" value="' + datasetValues.data.datasets[2].data.slice(0,132) + '" />');
+ $('#SAVE').append('<input type="hidden" name="back_left" value="' + datasetValues.data.datasets[3].data.slice(0,132) + '" />');
  $('#SAVE').append('<input type="hidden" name="id" value="' +  $("#saveName").val() + '" />');
 
  $("#SAVE").submit();

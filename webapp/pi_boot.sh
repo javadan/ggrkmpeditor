@@ -9,4 +9,4 @@ pip3 install gunicorn
 pip3 install flask_socketio
 pip3 install flask-executor
 pip3 install i2c_tools
-
+pip3 install pyserial
