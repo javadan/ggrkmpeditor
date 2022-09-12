@@ -522,6 +522,17 @@ def index():
     if 'back_left_adjuster' not in session:
         session['back_left_adjuster'] = 0
 
+    if 'gripper_1_adjuster' not in session:
+        session['g1_adjuster'] = 0
+    
+    if 'gripper_2_adjuster' not in session:
+        session['g2_adjuster'] = 0
+
+    if 'gripper_3_adjuster' not in session:
+        session['g3_adjuster'] = 0
+
+    if 'gripper_4_adjuster' not in session:
+        session['g4_adjuster'] = 0
 
     print ("INDEX MOTION: " + session['MOTION'])
     print ("INDEX MOTION2: " + session['MOTION2'])
@@ -550,6 +561,10 @@ def index():
            "fl_adjust"  :session['front_left_adjuster'],
            "br_adjust"  :session['back_right_adjuster'],
            "bl_adjust"  :session['back_left_adjuster'],
+           "g1_adjust"  :session['g1_adjuster'],
+           "g2_adjust"  :session['g2_adjuster'],
+           "g3_adjust"  :session['g3_adjuster'],
+           "g4_adjust"  :session['g4_adjuster'],
            "x"          :json.dumps(np.arange(front_right.size).tolist()),
            "front_right":json.dumps(front_right.tolist()),
            "front_left" :json.dumps(front_left.tolist()),
@@ -586,10 +601,10 @@ def settoadjusters():
         servo1.angle = 90 - session['front_left_adjuster']
         servo2.angle = 90 + session['back_right_adjuster']
         servo3.angle = 90 - session['back_left_adjuster']
-        servo4.angle = 90
-        servo5.angle = 90
-        servo6.angle = 90
-        servo7.angle = 90
+        servo4.angle = 90 + session['g1_adjuster']
+        servo5.angle = 90 - session['g2_adjuster']
+        servo6.angle = 90 + session['g3_adjuster']
+        servo7.angle = 90 - session['g4_adjuster']
 
     if is_scservo_robot:
                 
@@ -786,6 +801,42 @@ def updateRight():
 
 
 
+
+@app.route('/setg1', methods=['POST', 'GET'])
+def setg1():
+    data = request.get_json()
+    print (data)
+    session['g1_adjuster'] = int(data[0]['g1'])
+    print(session['g1_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg2', methods=['POST', 'GET'])
+def setg2():
+    data = request.get_json()
+    print (data)
+    session['g2_adjuster'] = int(data[0]['g2'])
+    print(session['g2_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg3', methods=['POST', 'GET'])
+def setg3():
+    data = request.get_json()
+    print (data)
+    session['g3_adjuster'] = int(data[0]['g3'])
+    print(session['g3_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg4', methods=['POST', 'GET'])
+def setg4():
+    data = request.get_json()
+    print (data)
+    session['g4_adjuster'] = int(data[0]['g4'])
+    print(session['g4_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
 
 @app.route('/setfr', methods=['POST', 'GET'])
 def setfr():
@@ -1398,6 +1449,11 @@ def runadjustedmotiondirect(data):
             gripper_2 = gripper_2_update['gripper_2']
             gripper_3 = gripper_3_update['gripper_3']
             gripper_4 = gripper_4_update['gripper_4']
+            #adjust   - add them cause we're subtracting from 180 later.
+            gripper_1 = np.array(gripper_1) + int(session['g1_adjuster'])
+            gripper_2 = np.array(gripper_2) + int(session['g2_adjuster'])
+            gripper_3 = np.array(gripper_3) + int(session['g3_adjuster'])
+            gripper_4 = np.array(gripper_4) + int(session['g4_adjuster'])
     
     
        
@@ -1411,13 +1467,15 @@ def runadjustedmotiondirect(data):
         r_front_left = 180-r_front_left
         r_back_left = 180-r_back_left
    
-        
+         
     
         if not four_servo_mode:
             gripper_1 = np.tile(gripper_1, NUM_TIMES)
             gripper_2 = np.tile(gripper_2, NUM_TIMES)
             gripper_3 = np.tile(gripper_3, NUM_TIMES)
             gripper_4 = np.tile(gripper_4, NUM_TIMES)
+            gripper_2 = 180 - gripper_2
+            gripper_4 = 180 - gripper_4
     
         if is_pca9685_robot: 
             for i in range(len(r_front_right)):
