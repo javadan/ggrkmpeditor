@@ -4,7 +4,10 @@
 Backup for Gallus Gallus Roboticus project 
 Kinetic Motion Primitives editor
 
-mirandamoss.com/gallusgallusroboticus
+Copyleft License
+
+[mirandamoss.com/gallusgallusroboticus](https://mirandamoss.com/gallusgallusroboticus)
+
 
 A basic robot control UI integrating with a few sensors and controllers.
 
