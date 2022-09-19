@@ -426,6 +426,69 @@
 	
 				</td>
 			</tr>
+
+	
+			<tr>
+				<td width="100">
+	Gripper_1 Adjust
+				</td>
+				<td width="100">
+	Gripper_2 Adjust
+				</td>
+				<td width="100">
+	Gripper_3 Adjust
+				</td>
+				<td width="100">
+	Gripper_4 Adjust
+				</td>
+
+                        </tr>
+	
+
+			<tr>
+				<td>
+	
+	<div class="wrapper2" id="g1_adjust">
+	</div>
+	
+	<div class="slider-wrapper">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="g1_slider" name="g1_slider" oninput="changeG1Shift()" onchange="changeG1Shift()">
+	</div>
+				</td>
+				<td>
+	
+	<div class="wrapper2" id="g2_adjust">
+	</div>
+	
+	<div class="slider-wrapper">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="g2_slider" name="g2_slider" oninput="changeG2Shift()" onchange="changeG2Shift()">
+	</div>
+				</td>
+				<td>
+	
+	<div class="wrapper2" id="g3_adjust">
+	</div>
+	
+	<div class="slider-wrapper">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="g3_slider" name="g3_slider" oninput="changeG3Shift()" onchange="changeG3Shift()">
+	</div>
+	
+				</td>
+				<td>
+	
+	<div class="wrapper2" id="g4_adjust">
+	</div>
+	
+	<div class="slider-wrapper">
+	<input type="range" class="slider" step="1" value="0" min="-100" max="100" id="g4_slider" name="g4_slider" oninput="changeG4Shift()" onchange="changeG4Shift()">
+	</div>
+	
+	
+				</td>
+			</tr>
+
+
+
 			<tr>
 				<td rowspan=4>
 					<br/><br/>
@@ -770,6 +833,16 @@ var back_right_adjuster_value = back_right_last_adjuster_value;
 var back_left_adjuster_value = back_left_last_adjuster_value;
 
 
+var g1_last_adjuster_value = {{leg_data.g1_adjust}};
+var g2_last_adjuster_value = {{leg_data.g2_adjust}};
+var g3_last_adjuster_value = {{leg_data.g3_adjust}};
+var g4_last_adjuster_value = {{leg_data.g4_adjust}};
+
+var g1_adjuster_value = g1_last_adjuster_value;
+var g2_adjuster_value = g2_last_adjuster_value;
+var g3_adjuster_value = g3_last_adjuster_value;
+var g4_adjuster_value = g4_last_adjuster_value;
+
 document.getElementById("MOTION").innerHTML=String(MOTION); 
 document.getElementById("WIDTH").innerHTML=String( RANGE); 
 document.getElementById("TIMES").innerHTML=String( TIMES_VAL); 
@@ -786,10 +859,20 @@ document.getElementById("front_left_adjust").innerHTML=String( front_left_adjust
 document.getElementById("back_right_adjust").innerHTML=String( back_right_adjuster_value); 
 document.getElementById("back_left_adjust").innerHTML=String( back_left_adjuster_value); 
 
+document.getElementById("g1_adjust").innerHTML=String( g1_adjuster_value); 
+document.getElementById("g2_adjust").innerHTML=String( g2_adjuster_value); 
+document.getElementById("g3_adjust").innerHTML=String( g3_adjuster_value); 
+document.getElementById("g4_adjust").innerHTML=String( g4_adjuster_value); 
+
 document.getElementById("front_right_slider").value=front_right_adjuster_value; 
 document.getElementById("front_left_slider").value=front_left_adjuster_value; 
 document.getElementById("back_right_slider").value=back_right_adjuster_value; 
 document.getElementById("back_left_slider").value=back_left_adjuster_value; 
+
+document.getElementById("g1_slider").value=g1_adjuster_value; 
+document.getElementById("g2_slider").value=g2_adjuster_value; 
+document.getElementById("g3_slider").value=g3_adjuster_value; 
+document.getElementById("g4_slider").value=g4_adjuster_value; 
 
 
 
@@ -826,7 +909,7 @@ function setEdgesToNinety(event) {
     var len = dataset.length;
     
     //limit length to 132 (arbitrary, yes)
-    if (len > 132) {dataset = dataset.slice(0,132)}
+    if (len > 132) {dataset = dataset.slice(0,132);}
     
     len = dataset.length;
     
@@ -873,7 +956,7 @@ function changeRange(event) {
    RANGE = document.getElementById("points").value;
    document.getElementById("WIDTH").innerHTML=String(RANGE); 
 
-};
+}
 
 
 // UI only
@@ -896,7 +979,7 @@ function changeShift(event) {
    }
    // See console.
    window.myChart.update();
-};
+}
 
 
 <!---------------------------------------------->
@@ -921,7 +1004,7 @@ function FRPhase(event) {
    fr_last_phase_value = fr_phase_value;
    window.myChart.update();
 
-};
+}
 
 function FLPhase(event) {
    fl_phase_value = document.getElementById("phaseFL").value;
@@ -943,7 +1026,7 @@ function FLPhase(event) {
    
    fl_last_phase_value = fl_phase_value;
    window.myChart.update();
-};
+}
 
 function BRPhase(event) {
    br_phase_value = document.getElementById("phaseBR").value;
@@ -964,7 +1047,7 @@ function BRPhase(event) {
 
    br_last_phase_value = br_phase_value;
    window.myChart.update();
-};
+}
 
 
 function BLPhase(event) {
@@ -987,7 +1070,7 @@ function BLPhase(event) {
    bl_last_phase_value = bl_phase_value;
    window.myChart.update();
 
-};
+}
 
 <!---------------------------------------------->
 function FRShift(event) {
@@ -999,7 +1082,7 @@ function FRShift(event) {
    fr_last_adjuster_value = fr_adjuster_value;
    window.myChart.update();
 
-};
+}
 
 function FLShift(event) {
    fl_adjuster_value = document.getElementById("shiftFL").value;
@@ -1009,7 +1092,7 @@ function FLShift(event) {
    }
    fl_last_adjuster_value = fl_adjuster_value;
    window.myChart.update();
-};
+}
 
 function BRShift(event) {
    br_adjuster_value = document.getElementById("shiftBR").value;
@@ -1019,7 +1102,7 @@ function BRShift(event) {
    }
    br_last_adjuster_value = br_adjuster_value;
    window.myChart.update();
-};
+}
 
 
 function BLShift(event) {
@@ -1030,7 +1113,7 @@ function BLShift(event) {
    }
    bl_last_adjuster_value = bl_adjuster_value;
    window.myChart.update();
-};
+}
 
 
 
@@ -1044,7 +1127,7 @@ function FRAmp(event) {
    }
    //fr_last_amp_value = fr_amp_value;
    window.myChart.update();
-};
+}
 
 function FLAmp(event) {
    fl_amp_value = document.getElementById("ampFL").value;
@@ -1054,7 +1137,7 @@ function FLAmp(event) {
    }
    //fr_last_amp_value = fr_amp_value;
    window.myChart.update();
-};
+}
 
 function BRAmp(event) {
    br_amp_value = document.getElementById("ampBR").value;
@@ -1064,7 +1147,7 @@ function BRAmp(event) {
    }
    //fr_last_amp_value = fr_amp_value;
    window.myChart.update();
-};
+}
 
 function BLAmp(event) {
    bl_amp_value = document.getElementById("ampBL").value;
@@ -1074,7 +1157,7 @@ function BLAmp(event) {
    }
    //fr_last_amp_value = fr_amp_value;
    window.myChart.update();
-};
+}
 
 
 
@@ -1099,7 +1182,7 @@ function changeFRShift(event) {
        console.log(result);
      }
    });
-};
+}
 
 function changeFLShift(event) {
    front_left_adjuster_value = document.getElementById("front_left_slider").value;
@@ -1118,7 +1201,7 @@ function changeFLShift(event) {
        console.log(result);
      }
    });
-};
+}
 
 function changeBRShift(event) {
    back_right_adjuster_value = document.getElementById("back_right_slider").value;
@@ -1137,7 +1220,7 @@ function changeBRShift(event) {
        console.log(result);
      }
    });
-};
+}
 
 function changeBLShift(event) {
    back_left_adjuster_value = document.getElementById("back_left_slider").value;
@@ -1156,7 +1239,90 @@ function changeBLShift(event) {
        console.log(result);
      }
    });
-};
+}
+
+
+function changeG1Shift(event) {
+   g1_adjuster_value = document.getElementById("g1_slider").value;
+   document.getElementById("g1_adjust").innerHTML=String(g1_adjuster_value); 
+   g1_last_adjuster_value = g1_adjuster_value;
+
+   var saveData = [{"g1":g1_adjuster_value}];
+
+   $.ajax({
+     type: "POST",
+     url: "/setg1",
+     data: JSON.stringify(saveData),
+     contentType: "application/json",
+     dataType: 'json',
+     success: function(result) {
+       console.log(result);
+     }
+   });
+}
+
+
+function changeG2Shift(event) {
+   g2_adjuster_value = document.getElementById("g2_slider").value;
+   document.getElementById("g2_adjust").innerHTML=String(g2_adjuster_value); 
+   g2_last_adjuster_value = g2_adjuster_value;
+
+   var saveData = [{"g2":g2_adjuster_value}];
+
+   $.ajax({
+     type: "POST",
+     url: "/setg2",
+     data: JSON.stringify(saveData),
+     contentType: "application/json",
+     dataType: 'json',
+     success: function(result) {
+       console.log(result);
+     }
+   });
+}
+
+
+function changeG3Shift(event) {
+   g3_adjuster_value = document.getElementById("g3_slider").value;
+   document.getElementById("g3_adjust").innerHTML=String(g3_adjuster_value); 
+   g3_last_adjuster_value = g3_adjuster_value;
+
+   var saveData = [{"g3":g3_adjuster_value}];
+
+   $.ajax({
+     type: "POST",
+     url: "/setg3",
+     data: JSON.stringify(saveData),
+     contentType: "application/json",
+     dataType: 'json',
+     success: function(result) {
+       console.log(result);
+     }
+   });
+}
+
+
+function changeG4Shift(event) {
+   g4_adjuster_value = document.getElementById("g4_slider").value;
+   document.getElementById("g4_adjust").innerHTML=String(g4_adjuster_value); 
+   g4_last_adjuster_value = g4_adjuster_value;
+
+   var saveData = [{"g4":g4_adjuster_value}];
+
+   $.ajax({
+     type: "POST",
+     url: "/setg4",
+     data: JSON.stringify(saveData),
+     contentType: "application/json",
+     dataType: 'json',
+     success: function(result) {
+       console.log(result);
+     }
+   });
+
+}
+
+
 
 
 function flipper() {

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, url_for, send_file, copy_current_request_context
-from flask_session import Session
-from flask_socketio import SocketIO, emit, join_room, leave_room, close_room, rooms, disconnect
+from flask_session.__init__ import Session
+from flask_socketio.__init__ import SocketIO, emit, join_room, leave_room, close_room, rooms, disconnect
 from flask_executor import Executor
 
 import eventlet
@@ -52,6 +52,9 @@ has_arduino_at_115200 = config.settings['arduino_115200']
 has_realsense = config.settings['realsense']
 realsense_url = config.settings['realsense_url']
 has_picamera = config.settings['picamera']
+has_continuous_servo_on_pin_25 = config.settings['continuous_servo_on_pin_25']
+has_switches_on_pins_23_34 = config.settings['has_switches_on_pins_23_34']
+
 
 print('PCA9685 Robot:', is_pca9685_robot)
 print('SCServo Robot:',  is_scservo_robot)
@@ -60,6 +63,30 @@ print('Arduino:',  has_arduino_at_115200)
 print('Realsense:',  has_realsense)
 print('Realsense URL:',  realsense_url)
 print('Has picamera (Legacy RPi 32 bit):',  has_picamera)
+#gripper
+print('Has continuous servo on pin 25:',  has_continuous_servo_on_pin_25)
+print('Has switches on pin 23/24:',  has_switches_on_pins_23_34)
+
+if has_continuous_servo_on_pin_25:
+    import board
+    import pwmio
+    from adafruit_motor import servo
+    import RPi.GPIO as GPIO           
+    
+    pwm = pwmio.PWMOut(board.D25, frequency=50)
+    my_servo = servo.ContinuousServo(pwm, min_pulse = 500, max_pulse = 2500)
+
+    GPIO.setmode(GPIO.BCM)     
+    GPIO.setup(23, GPIO.IN)  
+    GPIO.setup(24, GPIO.IN) 
+    
+ 
+     #if GPIO.input(23) or GPIO.input(24): 
+
+#    my_servo.throttle = 1.0
+#    time.sleep(2.0)
+ 
+
 
 
 if has_picamera:
@@ -293,14 +320,14 @@ if is_pca9685_robot:
     servo6 = servo.Servo(pca.channels[6])
     servo7 = servo.Servo(pca.channels[7])
         
-    servo0.angle = 90
-    servo1.angle = 90
-    servo2.angle = 90
-    servo3.angle = 90
-    servo4.angle = 90
-    servo5.angle = 90
-    servo6.angle = 90
-    servo7.angle = 90
+#    servo0.angle = 90
+#    servo1.angle = 90
+#    servo2.angle = 90
+#    servo3.angle = 90
+#    servo4.angle = 90
+#    servo5.angle = 90
+#    servo6.angle = 90
+#    servo7.angle = 90
 
 
 
@@ -424,7 +451,7 @@ def index():
         print(checkpoints)
     
         cleanedList = [x for x in checkpoints if os.path.isdir(x)]
-        sorted_saves = sorted(cleanedList, key=lambda x: x[1], reverse=True) 
+        sorted_saves = sorted(cleanedList,  reverse=True) 
     
         print(sorted_saves)
         try: 
@@ -444,7 +471,7 @@ def index():
         print(checkpoints)
     
         cleanedList = [x for x in checkpoints if os.path.isdir(x)]
-        sorted_saves = sorted(cleanedList, key=lambda x: x[1], reverse=True) 
+        sorted_saves = sorted(cleanedList,  reverse=True) 
     
         print(sorted_saves)
 
@@ -522,6 +549,17 @@ def index():
     if 'back_left_adjuster' not in session:
         session['back_left_adjuster'] = 0
 
+    if 'gripper_1_adjuster' not in session:
+        session['g1_adjuster'] = 0
+    
+    if 'gripper_2_adjuster' not in session:
+        session['g2_adjuster'] = 0
+
+    if 'gripper_3_adjuster' not in session:
+        session['g3_adjuster'] = 0
+
+    if 'gripper_4_adjuster' not in session:
+        session['g4_adjuster'] = 0
 
     print ("INDEX MOTION: " + session['MOTION'])
     print ("INDEX MOTION2: " + session['MOTION2'])
@@ -550,6 +588,10 @@ def index():
            "fl_adjust"  :session['front_left_adjuster'],
            "br_adjust"  :session['back_right_adjuster'],
            "bl_adjust"  :session['back_left_adjuster'],
+           "g1_adjust"  :session['g1_adjuster'],
+           "g2_adjust"  :session['g2_adjuster'],
+           "g3_adjust"  :session['g3_adjuster'],
+           "g4_adjust"  :session['g4_adjuster'],
            "x"          :json.dumps(np.arange(front_right.size).tolist()),
            "front_right":json.dumps(front_right.tolist()),
            "front_left" :json.dumps(front_left.tolist()),
@@ -586,10 +628,10 @@ def settoadjusters():
         servo1.angle = 90 - session['front_left_adjuster']
         servo2.angle = 90 + session['back_right_adjuster']
         servo3.angle = 90 - session['back_left_adjuster']
-        servo4.angle = 90
-        servo5.angle = 90
-        servo6.angle = 90
-        servo7.angle = 90
+        servo4.angle = 90 + session['g1_adjuster']
+        servo5.angle = 90 - session['g2_adjuster']
+        servo6.angle = 90 + session['g3_adjuster']
+        servo7.angle = 90 - session['g4_adjuster']
 
     if is_scservo_robot:
                 
@@ -621,14 +663,25 @@ def stop():
     stop_robot_event.set()
 
     if is_pca9685_robot:
-        servo0.angle = 90
-        servo1.angle = 90
-        servo2.angle = 90
-        servo3.angle = 90
-        servo4.angle = 90
-        servo5.angle = 90
-        servo6.angle = 90
-        servo7.angle = 90
+        try:
+            servo0.angle = 90 + session['front_right_adjuster']
+            servo1.angle = 90 - session['front_left_adjuster']
+            servo2.angle = 90 + session['back_right_adjuster']
+            servo3.angle = 90 - session['back_left_adjuster']
+            servo4.angle = 90 + session['g1_adjuster']
+            servo5.angle = 90 - session['g2_adjuster']
+            servo6.angle = 90 + session['g3_adjuster']
+            servo7.angle = 90 - session['g4_adjuster']
+        except:
+            servo0.angle = 90
+            servo1.angle = 90
+            servo2.angle = 90
+            servo3.angle = 90
+            servo4.angle = 90
+            servo5.angle = 90
+            servo6.angle = 90
+            servo7.angle = 90
+
     elif is_scservo_robot:
 
         setSCServoPosition(1, 2048)
@@ -787,6 +840,42 @@ def updateRight():
 
 
 
+@app.route('/setg1', methods=['POST', 'GET'])
+def setg1():
+    data = request.get_json()
+    print (data)
+    session['g1_adjuster'] = int(data[0]['g1'])
+    print(session['g1_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg2', methods=['POST', 'GET'])
+def setg2():
+    data = request.get_json()
+    print (data)
+    session['g2_adjuster'] = int(data[0]['g2'])
+    print(session['g2_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg3', methods=['POST', 'GET'])
+def setg3():
+    data = request.get_json()
+    print (data)
+    session['g3_adjuster'] = int(data[0]['g3'])
+    print(session['g3_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg4', methods=['POST', 'GET'])
+def setg4():
+    data = request.get_json()
+    print (data)
+    session['g4_adjuster'] = int(data[0]['g4'])
+    print(session['g4_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
 @app.route('/setfr', methods=['POST', 'GET'])
 def setfr():
     data = request.get_json()
@@ -868,7 +957,7 @@ def combo():
     print(checkpoints)
     
     cleanedList = [x for x in checkpoints if os.path.isdir(x)]
-    sorted_saves = sorted(cleanedList, key=lambda x: x[1], reverse=True) 
+    sorted_saves = sorted(cleanedList,  reverse=True) 
     
     print(sorted_saves)
     comboArray = ['walk', 'walk']
@@ -1042,10 +1131,10 @@ def save():
     np.save(dirspath + 'angle_back_left_180.npy', back_left_list) 
 
 
-    np.savetxt(dirspath + 'angle_front_right_180.txt', front_right_list)
-    np.savetxt(dirspath + 'angle_front_left_180.txt', front_left_list)
-    np.savetxt(dirspath + 'angle_back_right_180.txt', back_right_list)
-    np.savetxt(dirspath + 'angle_back_left_180.txt', back_left_list)
+    np.savetxt(dirspath + 'angle_front_right_180.txt', front_right_list, fmt='%d')
+    np.savetxt(dirspath + 'angle_front_left_180.txt', front_left_list, fmt='%d')
+    np.savetxt(dirspath + 'angle_back_right_180.txt', back_right_list, fmt='%d')
+    np.savetxt(dirspath + 'angle_back_left_180.txt', back_left_list, fmt='%d')
 
 
 
@@ -1170,7 +1259,7 @@ def runBrain():
                 category_dir = "./motions/" + session[category] 
                 checkpoints = glob(category_dir + '/*')
                 checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
-                sorted_saves = sorted(checkpoint_dirs, key=lambda x: x[1], reverse=True) 
+                sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
 
 
 
@@ -1383,7 +1472,18 @@ def runadjustedmotiondirect(data):
         front_left = np.array(front_left) + int(session['front_left_adjuster'])
         back_right = np.array(back_right) + int(session['back_right_adjuster'])
         back_left = np.array(back_left) + int(session['back_left_adjuster'])
-    
+   
+        front_right[front_right > 179] = 179
+        front_left[front_left > 179] = 179
+        back_right[back_right > 179] = 179
+        back_left[back_left > 179] = 179
+
+        front_right[front_right < 1] = 1
+        front_left[front_left < 1] = 1
+        back_right[back_right < 1] = 1
+        back_left[back_left < 1] = 1
+
+
         print(len(front_right), " ",  len(front_left), " ", len(back_right), " ", len(back_left))
         min_len = min(len(front_right), len(front_left), len(back_right), len(back_left))
         front_right = front_right[:min_len]
@@ -1398,8 +1498,21 @@ def runadjustedmotiondirect(data):
             gripper_2 = gripper_2_update['gripper_2']
             gripper_3 = gripper_3_update['gripper_3']
             gripper_4 = gripper_4_update['gripper_4']
+            #adjust   - add them cause we're subtracting from 180 later.
+            gripper_1 = np.array(gripper_1) + int(session['g1_adjuster'])
+            gripper_2 = np.array(gripper_2) + int(session['g2_adjuster'])
+            gripper_3 = np.array(gripper_3) + int(session['g3_adjuster'])
+            gripper_4 = np.array(gripper_4) + int(session['g4_adjuster'])
+   
+            gripper_1[gripper_1 > 179] = 179
+            gripper_2[gripper_2 > 179] = 179
+            gripper_3[gripper_3 > 179] = 179
+            gripper_4[gripper_4 > 179] = 179
     
-    
+            gripper_1[gripper_1 < 1] = 1
+            gripper_2[gripper_2 < 1] = 1 
+            gripper_3[gripper_3 < 1] = 1
+            gripper_4[gripper_4 < 1] = 1
        
         NUM_TIMES = int(session['NUM_TIMES'])
         r_front_right = np.tile(front_right, NUM_TIMES)
@@ -1411,13 +1524,15 @@ def runadjustedmotiondirect(data):
         r_front_left = 180-r_front_left
         r_back_left = 180-r_back_left
    
-        
+         
     
         if not four_servo_mode:
             gripper_1 = np.tile(gripper_1, NUM_TIMES)
             gripper_2 = np.tile(gripper_2, NUM_TIMES)
             gripper_3 = np.tile(gripper_3, NUM_TIMES)
             gripper_4 = np.tile(gripper_4, NUM_TIMES)
+            gripper_2 = 180 - gripper_2
+            gripper_4 = 180 - gripper_4
     
         if is_pca9685_robot: 
             for i in range(len(r_front_right)):
