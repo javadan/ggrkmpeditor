@@ -1,6 +1,6 @@
 settings = dict(
     lidar = False,
-    pca9685_robot = True,
+    pca9685_robot = False,
     scservo_robot = False,
     arduino_115200 = False,
     realsense = False,
