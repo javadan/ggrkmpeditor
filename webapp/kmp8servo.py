@@ -491,6 +491,15 @@ def index():
         except:
             print("ERROR LOADING MOTION 1") 
        
+    if 'FORWARD8' not in session:
+        session['FORWARD8'] = None
+    if 'BACKWARDS8' not in session:
+        session['BACKWARDS8'] = None
+    if 'LEFT8' not in session:
+        session['LEFT8'] = None
+    if 'RIGHT8' not in session:
+        session['RIGHT8'] = None
+
     #Open defaults motions for 4 servos
     try: 
         with open("defaults/defaults.txt") as f:
