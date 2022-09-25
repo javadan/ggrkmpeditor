@@ -310,9 +310,11 @@
 
 	<td>
 
-	     <img id="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA == 1 }}">
-
+	<div id="imgdiv">
+	     <img id="refresh" name="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA == 1 }}">
+        </div>
 	     <input type="button" name="toggleCameraRefresh" id="toggleCameraRefresh" value="CAMERA ON/OFF" onclick="toggleCamera();" />	
+	     <input type="button" name="takePic" id="takePic" value="TAKE NEW PICTURE" onclick="snapshot()" />	
 
 
 		<table>
@@ -705,7 +707,8 @@ function runBrain() {
 function snapshot() {
     console.log("SNAPSHOT");
     $.get( {{ request.script_root|tojson|safe }} + '/snapshot', function( data ) {
-    console.log(data);
+//    console.log(data);
+    document.getElementById("imgdiv").innerHTML="<img id=\"refresh\" name=\"refresh\" src=\"{{ url_for('snapshot') if leg_data.CAMERA == 1 }}\">"
     })
 }
 

@@ -29,22 +29,7 @@ from time import strftime, sleep
 import time
 
 
-async_mode = None
-app = Flask(__name__)
-
-SESSION_TYPE = 'filesystem'
-app.config.from_object(__name__)
-Session(app)
-
-socketio = SocketIO(app, async_mode=async_mode)
-
-thread = None
-thread_lock = Lock()
-#for stopping the robot between http requests
-stop_robot_event = Event()
-
-
-
+    
 is_pca9685_robot = config.settings['pca9685_robot']
 is_scservo_robot = config.settings['scservo_robot'] # < for Feetech Smart bus servos (SMT, RS485)
 has_lidar = config.settings['lidar']
@@ -52,8 +37,12 @@ has_arduino_at_115200 = config.settings['arduino_115200']
 has_realsense = config.settings['realsense']
 realsense_url = config.settings['realsense_url']
 has_picamera = config.settings['picamera']
+has_libcamera = config.settings['libcamera']
 has_continuous_servo_on_pin_25 = config.settings['continuous_servo_on_pin_25']
 has_switches_on_pins_23_34 = config.settings['has_switches_on_pins_23_34']
+    
+
+
 
 
 print('PCA9685 Robot:', is_pca9685_robot)
@@ -63,6 +52,7 @@ print('Arduino:',  has_arduino_at_115200)
 print('Realsense:',  has_realsense)
 print('Realsense URL:',  realsense_url)
 print('Has picamera (Legacy RPi 32 bit):',  has_picamera)
+print('Has libcamera (RPi 64 bit):',  has_libcamera)
 #gripper
 print('Has continuous servo on pin 25:',  has_continuous_servo_on_pin_25)
 print('Has switches on pin 23/24:',  has_switches_on_pins_23_34)
@@ -92,7 +82,23 @@ if has_continuous_servo_on_pin_25:
 if has_picamera:
     import picamera
 
+if has_libcamera:
+    print("Importing picamera2")
+    from picamera2 import Picamera2, Preview
+   
+    def capture(camera, path='static/'):
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        camera.start()
+        timestamp = datetime.now().isoformat(timespec='seconds')
+        print('%s Image captured' % timestamp)
+    
+        file_path = os.path.join(path, '%s.jpg' % timestamp)
+        metadata = camera.capture_file(file_path)
+        print(metadata)
+        camera.stop()
 
+        return file_path
+    
 if is_pca9685_robot:
     from adafruit_motor import servo
     from adafruit_pca9685 import PCA9685
@@ -101,7 +107,7 @@ if is_pca9685_robot:
 
 elif is_scservo_robot:
     import serial
-    from scservo_sdk import *            
+    from scservo_sdk import *
 
     def pingServo(SCS_ID):
         # Get SCServo model number
@@ -143,7 +149,6 @@ elif is_scservo_robot:
     SCS_MOVING_ACC              = 0                 # SCServo moving acc
     protocol_end                = 0                 # SCServo bit end(STS/SMS=0, SCS=1)
     
-
     portHandler = PortHandler(DEVICENAME)
     packetHandler = PacketHandler(protocol_end)
     groupSyncWrite = GroupSyncWrite(portHandler, packetHandler, ADDR_STS_GOAL_POSITION, 2)
@@ -319,19 +324,25 @@ if is_pca9685_robot:
     servo5 = servo.Servo(pca.channels[5])
     servo6 = servo.Servo(pca.channels[6])
     servo7 = servo.Servo(pca.channels[7])
-        
-#    servo0.angle = 90
-#    servo1.angle = 90
-#    servo2.angle = 90
-#    servo3.angle = 90
-#    servo4.angle = 90
-#    servo5.angle = 90
-#    servo6.angle = 90
-#    servo7.angle = 90
+
+    
+
+####################
 
 
+async_mode = None
+app = Flask(__name__)
 
+SESSION_TYPE = 'filesystem'
+app.config.from_object(__name__)
+Session(app)
 
+socketio = SocketIO(app, async_mode=async_mode)
+
+thread = None
+thread_lock = Lock()
+#for stopping the robot between http requests
+stop_robot_event = Event()
 
 
 
@@ -349,14 +360,20 @@ SHIFT_VAL = 0
 CAMERA = 1
 
 
+#SCS1_ID = 1
+#SCS2_ID = 2
+#SCS3_ID = 3
+#SCS4_ID = 4
+#ADDR_SCS_TORQUE_ENABLE     = 40
+
 def shutdown_scservo(SC_ID):
 
         # SCServo#1 torque
-        scs_comm_result, scs_error = packetHandler.write1ByteTxRx(portHandler, SC_ID, ADDR_SCS_TORQUE_ENABLE, 0)
-        if scs_comm_result != COMM_SUCCESS:
-            print("%s" % packetHandler.getTxRxResult(scs_comm_result))
-        elif scs_error != 0:
-            print("%s" % packetHandler.getRxPacketError(scs_error))
+    scs_comm_result, scs_error = packetHandler.write1ByteTxRx(portHandler, SC_ID, ADDR_SCS_TORQUE_ENABLE, 0)
+    if scs_comm_result != COMM_SUCCESS:
+        print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+    elif scs_error != 0:
+        print("%s" % packetHandler.getRxPacketError(scs_error))
         
 
 #####################
@@ -421,9 +438,8 @@ def index():
     if 'CAMERA' not in session:
         session['CAMERA'] = 1
 
-    if not has_picamera:
+    if not has_picamera and not has_libcamera:
         session['CAMERA'] = 0
-
 
     if 'MOTION' not in session:
         session['MOTION'] = 'walk'
@@ -712,7 +728,7 @@ def stop():
         if scs_comm_result != COMM_SUCCESS:
             print("%s" % packetHandler.getTxRxResult(scs_comm_result))
                 
-                # Clear syncwrite parameter storage
+        # Clear syncwrite parameter storage
         groupSyncWrite.clearParam()
 
 
@@ -1460,7 +1476,7 @@ def runBrain():
 @app.route('/runadjustedmotion', methods=['POST', 'GET'])
 def runadjustedmotion():
     data = request.get_json()
-    return runadjustedmotiondirect(data, False, True)
+    return runadjustedmotiondirect(data, True, True)
 
 def runadjustedmotiondirect(data, needs_to_extract, as_thread):
     @copy_current_request_context
@@ -1645,28 +1661,27 @@ def save_image():
     if has_picamera:
         timestr = time.strftime("%Y%m%d-%H%M%S")
         lastfile = "static/snap_" + timestr + ".jpg"
-        camera = picamera.PiCamera()
-        camera.resolution = (640, 480)
-        camera.start_preview()
+        cam = picamera.PiCamera()
+        cam.resolution = (640, 480)
+        cam.start_preview()
         sleep(2)
-        camera.capture(lastfile)
-        camera.stop_preview()
+        cam.capture(lastfile)
+        cam.stop_preview()
+        cam.close()
+    elif has_libcamera:
+        print("Capture still")
+        camera = Picamera2()
+        camera.start_preview(Preview.NULL)
+        camera.still_configuration.size = (800, 600)
+        lastfile = capture(camera)
+        print(lastfile)
         camera.close()
-    
     return(lastfile)
 
 
 @app.route('/snapshot')
 def snapshot():
     return send_file(save_image())
-
-@app.route("/snapshot2")
-def getImage():
-    if has_picamera:
-        camera.capture(lastfile)
-        camera.close()
-
-    return send_file(lastfile)
 
 
 
