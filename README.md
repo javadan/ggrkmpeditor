@@ -27,7 +27,10 @@ Options:
     arduino_115200 : Robot is using an Arduino, returning Left (L), Front (F), Right (R) distances over serial 
     realsense : Robot is using Realsense D4XX depth/rgb sensor
     realsense_url : URL to retrieve Realsense data
-    picamera : Has RPi camera attached. (Deprecated in newest RPi Bullseye, in favour of libcamera. (TODO)) 
+    picamera : Has 32-bit RPi 'raspi' camera attached 
+    libcamera : Has 64-bit RPi 'libcamera' camera attached
+    continuous_servo_on_pin_25 : For gripper robots, additional servo features (TODO)
+    has_switches_on_pins_23_34 : For gripper robots, additional (2) switch inputs
 ```
     
 Hardware setup:
