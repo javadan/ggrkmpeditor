@@ -7,6 +7,7 @@ import eventlet
 from eventlet import wsgi
 from eventlet import websocket
 from threading import Thread, Event, Lock
+import threading
 
 import math
 import serial
@@ -1174,6 +1175,7 @@ def save():
     return index()
 
 
+
 @app.route('/fidget', methods=['POST', 'GET'])
 def fidget():
 
@@ -1235,7 +1237,7 @@ def validate_motion(motions, adjuster_array):
     back_left = 180-back_left
         
     min_len = min(len(front_right), len(front_left), len(back_right), len(back_left))
-
+    min_len = min(min_len, 130)
     front_right = front_right[:min_len]
     front_left = front_left[:min_len]
     back_right = back_right[:min_len]
@@ -1412,7 +1414,6 @@ def runBrain():
 
             except:
                 print(traceback.format_exc())
-                print("ERROR LOADING ", child) 
     
     
         #end runMotionFromCategory
