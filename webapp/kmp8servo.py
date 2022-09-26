@@ -1694,8 +1694,5 @@ def snapshot():
     return send_file(save_image())
 
 
-
 if __name__ == '__main__':
-    #executor = Executor(app)
     socketio.run(app, debug=True, host='0.0.0.0')
-    #app.run(debug=True, host='0.0.0.0')

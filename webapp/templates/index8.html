@@ -77,7 +77,55 @@ SHIFT UP OR DOWN
 
 
 </td>
-<td/>
+<td>		<table>
+			<tr  style="vertical-align : middle; text-align:center;" >
+                               <td>
+                               </td>
+                               <td>
+				    <img src="static/up.png"/>
+                                
+                               </td>
+                               <td>
+				      = <div id="FORWARD8" />
+                               </td>
+                               <td>
+                               </td>
+
+			</tr>
+
+			<tr  style="vertical-align : middle; text-align:center;" >
+                               <td>
+				    <img src="static/left.png"/>
+                               </td>
+                               <td>
+				      = <div id="LEFT8" />
+                                
+                               </td>
+                               <td>
+				    <img src="static/right.png"/>
+                               </td>
+                               <td>
+				      = <div id="RIGHT8" />
+                               </td>
+			</tr>
+
+			<tr  style="vertical-align : middle; text-align:center;" >
+                               <td>
+                               </td>
+                               <td>
+				    <img src="static/down.png"/>
+                               </td>
+                               <td>
+				      = <div id="BACKWARDS8" />
+                               </td>
+                               <td>
+                               </td>
+			</tr>
+			</table>
+
+
+</td>
+
 </tr>
 
 <tr>
@@ -112,6 +160,10 @@ SHIFT UP OR DOWN
 
 <button onclick="run()">RUN</button>
 <button onclick="stop()">SET ANGLES to 90</button>
+<br/>
+<button onclick="stop()">KILL SWITCH</button>
+<button onclick="runBrain()">TURN ON BRAIN</button>
+
 <br/>
 </td>
 <td>
@@ -173,6 +225,19 @@ $("#selectGripper").val(MOTION2);
 
 $("#comboName").val(COMBONAME);
 $("#loadComboName").val(COMBONAME);
+
+
+
+var FORWARD_VAL = "{{leg_data.FORWARD8}}";
+var BACKWARDS_VAL = "{{leg_data.BACKWARDS8}}";
+var LEFT_VAL = "{{leg_data.LEFT8}}";
+var RIGHT_VAL = "{{leg_data.RIGHT8}}";
+
+
+document.getElementById("FORWARD8").innerHTML=String(FORWARD_VAL); 
+document.getElementById("BACKWARDS8").innerHTML=String(BACKWARDS_VAL); 
+document.getElementById("LEFT8").innerHTML=String(LEFT_VAL); 
+document.getElementById("RIGHT8").innerHTML=String(RIGHT_VAL); 
 
 
 var currentMode = '{{leg_data.MODE}}';
@@ -778,6 +843,24 @@ function stop() {
 
 
 
+
+function runBrain() {
+    console.log("TURNING ON 8-SERVO BRAIN...");
+    
+ $.ajax({
+   type: "POST",
+   url: "/runBrain",
+   data: {},
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+
+
+}
+
 /*Search and JS Folder Tree*/
 $(function () {
     $('#container').jstree({
@@ -840,6 +923,9 @@ $(function () {
 			}
 		}
 	} ,
+	'contextmenu' : {
+			'items' : customMenu
+        },
         'plugins' : ["wholerow"]
 		}).bind("dblclick.jstree", function (event) {
              var node = $(event.target).closest("li");
@@ -851,6 +937,107 @@ $(function () {
 
 });
 
+
+
+
+//Add right click context menu to set default direction motions
+function customMenu(node) {
+    var items = {
+        forwardItem: { 
+            label: "Set FORWARD",
+            _name:node,
+            action: function (node) {
+	        var data = node.item._name.text;
+                document.getElementById("FORWARD8").innerHTML=String(data); 
+
+			    var saveData = [{"data":data}];
+            
+                $.ajax({
+                  type: "POST",
+                  url: "/updateForward8",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  success: function(result) {
+                    console.log(result);
+                  }
+                });
+            
+	    }
+        },
+        backItem: { 
+            label: "Set BACK",
+            _name:node,
+            action: function (node) {
+	        var data = node.item._name.text;
+                document.getElementById("BACKWARDS8").innerHTML=String(data); 
+		
+			    var saveData = [{"data":data}];
+            
+                $.ajax({
+                  type: "POST",
+                  url: "/updateBackwards8",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  success: function(result) {
+                    console.log(result);
+                  }
+                });
+            
+	    }
+        },
+        leftItem: { 
+            label: "Set LEFT",
+            _name:node,
+            action: function (node) {
+	        var data = node.item._name.text;
+                document.getElementById("LEFT8").innerHTML=String(data); 
+	        
+			    var saveData = [{"data":data}];
+            
+                $.ajax({
+                  type: "POST",
+                  url: "/updateLeft8",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  success: function(result) {
+                    console.log(result);
+                  }
+                });
+            
+	    }
+        },
+        rightItem: { 
+            label: "Set RIGHT",
+            _name:node,
+            action: function (node) {
+	        var data = node.item._name.text;
+                document.getElementById("RIGHT8").innerHTML=String(data); 
+		
+			    var saveData = [{"data":data}];
+            
+                $.ajax({
+                  type: "POST",
+                  url: "/updateRight8",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  success: function(result) {
+                    console.log(result);
+                  }
+                });
+            
+	    }
+        }
+
+	
+    };
+
+
+    return items;
+}
 
 
 </script>       
