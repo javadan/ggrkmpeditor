@@ -7,6 +7,7 @@ import eventlet
 from eventlet import wsgi
 from eventlet import websocket
 from threading import Thread, Event, Lock
+import threading
 
 import math
 import serial
@@ -29,22 +30,7 @@ from time import strftime, sleep
 import time
 
 
-async_mode = None
-app = Flask(__name__)
-
-SESSION_TYPE = 'filesystem'
-app.config.from_object(__name__)
-Session(app)
-
-socketio = SocketIO(app, async_mode=async_mode)
-
-thread = None
-thread_lock = Lock()
-#for stopping the robot between http requests
-stop_robot_event = Event()
-
-
-
+    
 is_pca9685_robot = config.settings['pca9685_robot']
 is_scservo_robot = config.settings['scservo_robot'] # < for Feetech Smart bus servos (SMT, RS485)
 has_lidar = config.settings['lidar']
@@ -52,8 +38,12 @@ has_arduino_at_115200 = config.settings['arduino_115200']
 has_realsense = config.settings['realsense']
 realsense_url = config.settings['realsense_url']
 has_picamera = config.settings['picamera']
+has_libcamera = config.settings['libcamera']
 has_continuous_servo_on_pin_25 = config.settings['continuous_servo_on_pin_25']
 has_switches_on_pins_23_34 = config.settings['has_switches_on_pins_23_34']
+    
+
+
 
 
 print('PCA9685 Robot:', is_pca9685_robot)
@@ -63,6 +53,7 @@ print('Arduino:',  has_arduino_at_115200)
 print('Realsense:',  has_realsense)
 print('Realsense URL:',  realsense_url)
 print('Has picamera (Legacy RPi 32 bit):',  has_picamera)
+print('Has libcamera (RPi 64 bit):',  has_libcamera)
 #gripper
 print('Has continuous servo on pin 25:',  has_continuous_servo_on_pin_25)
 print('Has switches on pin 23/24:',  has_switches_on_pins_23_34)
@@ -92,7 +83,23 @@ if has_continuous_servo_on_pin_25:
 if has_picamera:
     import picamera
 
+if has_libcamera:
+    print("Importing picamera2")
+    from picamera2 import Picamera2, Preview
+   
+    def capture(camera, path='static/'):
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        camera.start()
+        timestamp = datetime.now().isoformat(timespec='seconds')
+        print('%s Image captured' % timestamp)
+    
+        file_path = os.path.join(path, '%s.jpg' % timestamp)
+        metadata = camera.capture_file(file_path)
+        print(metadata)
+        camera.stop()
 
+        return file_path
+    
 if is_pca9685_robot:
     from adafruit_motor import servo
     from adafruit_pca9685 import PCA9685
@@ -101,7 +108,7 @@ if is_pca9685_robot:
 
 elif is_scservo_robot:
     import serial
-    from scservo_sdk import *            
+    from scservo_sdk import *
 
     def pingServo(SCS_ID):
         # Get SCServo model number
@@ -143,7 +150,6 @@ elif is_scservo_robot:
     SCS_MOVING_ACC              = 0                 # SCServo moving acc
     protocol_end                = 0                 # SCServo bit end(STS/SMS=0, SCS=1)
     
-
     portHandler = PortHandler(DEVICENAME)
     packetHandler = PacketHandler(protocol_end)
     groupSyncWrite = GroupSyncWrite(portHandler, packetHandler, ADDR_STS_GOAL_POSITION, 2)
@@ -319,27 +325,25 @@ if is_pca9685_robot:
     servo5 = servo.Servo(pca.channels[5])
     servo6 = servo.Servo(pca.channels[6])
     servo7 = servo.Servo(pca.channels[7])
-        
-#    servo0.angle = 90
-#    servo1.angle = 90
-#    servo2.angle = 90
-#    servo3.angle = 90
-#    servo4.angle = 90
-#    servo5.angle = 90
-#    servo6.angle = 90
-#    servo7.angle = 90
+
+    
+
+####################
 
 
+async_mode = None
+app = Flask(__name__)
 
+SESSION_TYPE = 'filesystem'
+app.config.from_object(__name__)
+Session(app)
 
+socketio = SocketIO(app, async_mode=async_mode)
 
-def poll_realsense():
-    response = requests.post(url=realsense_url)
-    print(response)
-    return response
-
-
-
+thread = None
+thread_lock = Lock()
+#for stopping the robot between http requests
+stop_robot_event = Event()
 
 
 
@@ -357,14 +361,20 @@ SHIFT_VAL = 0
 CAMERA = 1
 
 
+#SCS1_ID = 1
+#SCS2_ID = 2
+#SCS3_ID = 3
+#SCS4_ID = 4
+#ADDR_SCS_TORQUE_ENABLE     = 40
+
 def shutdown_scservo(SC_ID):
 
         # SCServo#1 torque
-        scs_comm_result, scs_error = packetHandler.write1ByteTxRx(portHandler, SC_ID, ADDR_SCS_TORQUE_ENABLE, 0)
-        if scs_comm_result != COMM_SUCCESS:
-            print("%s" % packetHandler.getTxRxResult(scs_comm_result))
-        elif scs_error != 0:
-            print("%s" % packetHandler.getRxPacketError(scs_error))
+    scs_comm_result, scs_error = packetHandler.write1ByteTxRx(portHandler, SC_ID, ADDR_SCS_TORQUE_ENABLE, 0)
+    if scs_comm_result != COMM_SUCCESS:
+        print("%s" % packetHandler.getTxRxResult(scs_comm_result))
+    elif scs_error != 0:
+        print("%s" % packetHandler.getRxPacketError(scs_error))
         
 
 #####################
@@ -429,9 +439,8 @@ def index():
     if 'CAMERA' not in session:
         session['CAMERA'] = 1
 
-    if not has_picamera:
+    if not has_picamera and not has_libcamera:
         session['CAMERA'] = 0
-
 
     if 'MOTION' not in session:
         session['MOTION'] = 'walk'
@@ -483,6 +492,16 @@ def index():
         except:
             print("ERROR LOADING MOTION 1") 
        
+    if 'FORWARD8' not in session:
+        session['FORWARD8'] = None
+    if 'BACKWARDS8' not in session:
+        session['BACKWARDS8'] = None
+    if 'LEFT8' not in session:
+        session['LEFT8'] = None
+    if 'RIGHT8' not in session:
+        session['RIGHT8'] = None
+
+    #Open defaults motions for 4 servos
     try: 
         with open("defaults/defaults.txt") as f:
             print("OPENED DEFAULTS FILE")
@@ -499,6 +518,7 @@ def index():
     except:
         print("ERROR:Missing defaults file?")
 
+    #Open defaults motions for 8 servos
     try: 
         with open("defaults/defaults8.txt") as f:
             print("OPENED DEFAULTS8 FILE")
@@ -516,7 +536,7 @@ def index():
         print("ERROR:Missing defaults8 file?")
 
 
-    #set some defaults
+    #set defaults if not defined yet in Flask session.
     try:
         four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
         if session['MODE'] is None:
@@ -577,6 +597,8 @@ def index():
 
     if 'gripper_4_adjuster' not in session:
         session['g4_adjuster'] = 0
+        
+    #Some debugging
 
     print ("INDEX MOTION: " + session['MOTION'])
     print ("INDEX MOTION2: " + session['MOTION2'])
@@ -630,8 +652,6 @@ def index():
 
 
 
-
-
 def setSCServoPosition(SCS_ID, servo_angle):
     print("Setting Position ", SCS_ID, " to ", servo_angle)
     param_goal_position = [SCS_LOBYTE(servo_angle), SCS_HIBYTE(servo_angle)]
@@ -655,6 +675,7 @@ def settoadjusters():
         servo7.angle = 90 - session['g4_adjuster']
 
     if is_scservo_robot:
+        #Only handles 4 servos for Feetech robots
                 
         servo0_angle = int(remap(90 + int(session['front_right_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
         servo1_angle = int(remap(90 - int(session['front_left_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
@@ -685,6 +706,7 @@ def stop():
 
     if is_pca9685_robot:
         try:
+            #Set to default positions
             servo0.angle = 90 + session['front_right_adjuster']
             servo1.angle = 90 - session['front_left_adjuster']
             servo2.angle = 90 + session['back_right_adjuster']
@@ -694,6 +716,7 @@ def stop():
             servo6.angle = 90 + session['g3_adjuster']
             servo7.angle = 90 - session['g4_adjuster']
         except:
+            #Adjusters not set
             servo0.angle = 90
             servo1.angle = 90
             servo2.angle = 90
@@ -704,7 +727,7 @@ def stop():
             servo7.angle = 90
 
     elif is_scservo_robot:
-
+         #Feetech servos are from 0 to 4096.  2048 for 90 degrees.
         setSCServoPosition(1, 2048)
         setSCServoPosition(2, 2048)
         setSCServoPosition(3, 2048)
@@ -715,12 +738,15 @@ def stop():
         if scs_comm_result != COMM_SUCCESS:
             print("%s" % packetHandler.getTxRxResult(scs_comm_result))
                 
-                # Clear syncwrite parameter storage
+        # Clear syncwrite parameter storage
         groupSyncWrite.clearParam()
 
 
     results = {'processed': 'true'}
     return jsonify(results)
+
+
+
 
 @app.route('/setrepeat', methods=['POST', 'GET'])
 def setrepeat():
@@ -744,282 +770,106 @@ def setdelay():
 
 
 
+def updateDefault(motionName, defaultFileName):
+    try: 
+       
+        defaultsArray = []
+
+        with open(defaultFileName) as f:
+            print("OPENED %s FILE" % defaultFileName)
+            forward = f.readline().rstrip("\n") 
+            backwards = f.readline().rstrip("\n") 
+            left = f.readline().rstrip("\n") 
+            right = f.readline().rstrip("\n") 
+
+            if ("FORWARD" in motionName):        
+                defaultsArray = [session[motionName], backwards, left, right]
+            elif ("BACKWARDS" in motionName):        
+                defaultsArray = [forward, session[motionName], left, right]
+            elif ("LEFT" in motionName):        
+                defaultsArray = [forward, backwards, session[motionName], right]
+            elif ("RIGHT" in motionName):        
+                defaultsArray = [forward, backwards, left, session[motionName]]
+
+            npArray = np.array(defaultsArray)
+
+            np.savetxt(defaultFileName, npArray, fmt="%s")
+
+    except:
+        print("Failed to update %s in %s" % motionName, defaultFileName)
+
+
 
 
 
 @app.route('/updateForward', methods=['POST'])
 def updateForward():
     data = request.get_json()
-    print (data)
     session['FORWARD'] = data[0]['data']
-    print(session['FORWARD'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults.txt") as f:
-            print("OPENED DEFAULTS FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [session['FORWARD'], backwards, left, right]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Forward")
-
+    updateDefault("FORWARD", "defaults/defaults.txt")
     results = {'processed': 'true'}
     return jsonify(results)
 
 @app.route('/updateBackwards', methods=['POST'])
 def updateBackwards():
     data = request.get_json()
-    print (data)
     session['BACKWARDS'] = data[0]['data']
-    print(session['BACKWARDS'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults.txt") as f:
-            print("OPENED DEFAULTS FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [forward, session['BACKWARDS'], left, right]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Backwards")
-    
+    updateDefault("BACKWARDS", "defaults/defaults.txt")    
     results = {'processed': 'true'}
     return jsonify(results)
 
 @app.route('/updateLeft', methods=['POST'])
 def updateLeft():
     data = request.get_json()
-    print (data)
     session['LEFT'] = data[0]['data']
-    print(session['LEFT'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults.txt") as f:
-            print("OPENED DEFAULTS FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [forward, backwards, session['LEFT'], right]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Left")
-    
+    updateDefault("LEFT", "defaults/defaults.txt")    
     results = {'processed': 'true'}
     return jsonify(results)
 
 @app.route('/updateRight', methods=['POST'])
 def updateRight():
     data = request.get_json()
-    print (data)
     session['RIGHT'] = data[0]['data']
-    print(session['RIGHT'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults.txt") as f:
-            print("OPENED DEFAULTS FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [forward, backwards, left, session['RIGHT']]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Right")
-    
+    updateDefault("RIGHT", "defaults/defaults.txt")    
     results = {'processed': 'true'}
     return jsonify(results)
-
 
 
 
 @app.route('/updateForward8', methods=['POST'])
 def updateForward8():
     data = request.get_json()
-    print (data)
     session['FORWARD8'] = data[0]['data']
-    print(session['FORWARD8'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults8.txt") as f:
-            print("OPENED DEFAULTS8 FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [session['FORWARD8'], backwards, left, right]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults8.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Forward8")
-
+    updateDefault("FORWARD8", "defaults/defaults8.txt")
     results = {'processed': 'true'}
     return jsonify(results)
 
 @app.route('/updateBackwards8', methods=['POST'])
 def updateBackwards8():
     data = request.get_json()
-    print (data)
     session['BACKWARDS8'] = data[0]['data']
-    print(session['BACKWARDS8'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults8.txt") as f:
-            print("OPENED DEFAULTS8 FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [forward, session['BACKWARDS8'], left, right]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults8.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Backwards8")
-    
+    updateDefault("BACKWARDS8", "defaults/defaults8.txt")
     results = {'processed': 'true'}
     return jsonify(results)
 
 @app.route('/updateLeft8', methods=['POST'])
 def updateLeft8():
     data = request.get_json()
-    print (data)
     session['LEFT8'] = data[0]['data']
-    print(session['LEFT8'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults8.txt") as f:
-            print("OPENED DEFAULTS FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [forward, backwards, session['LEFT8'], right]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults8.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Left8")
-    
+    updateDefault("LEFT8", "defaults/defaults8.txt")
     results = {'processed': 'true'}
     return jsonify(results)
 
 @app.route('/updateRight8', methods=['POST'])
 def updateRight8():
     data = request.get_json()
-    print (data)
     session['RIGHT8'] = data[0]['data']
-    print(session['RIGHT8'])
-    try: 
-       
-        defaultsArray = []
-
-        with open("defaults/defaults8.txt") as f:
-            print("OPENED DEFAULTS FILE")
-            forward = f.readline().rstrip("\n") 
-            backwards = f.readline().rstrip("\n") 
-            left = f.readline().rstrip("\n") 
-            right = f.readline().rstrip("\n") 
-        
-            defaultsArray = [forward, backwards, left, session['RIGHT8']]
-    
-        npArray = np.array(defaultsArray)
-
-        np.savetxt("defaults/defaults8.txt", npArray, fmt="%s")
-
-    except:
-        print("Failed to update Right8")
-    
+    updateDefault("RIGHT8", "defaults/defaults8.txt")
     results = {'processed': 'true'}
     return jsonify(results)
 
 
 
-
-@app.route('/setg1', methods=['POST', 'GET'])
-def setg1():
-    data = request.get_json()
-    print (data)
-    session['g1_adjuster'] = int(data[0]['g1'])
-    print(session['g1_adjuster'])
-    results = {'processed': 'true'}
-    return jsonify(results)
-
-@app.route('/setg2', methods=['POST', 'GET'])
-def setg2():
-    data = request.get_json()
-    print (data)
-    session['g2_adjuster'] = int(data[0]['g2'])
-    print(session['g2_adjuster'])
-    results = {'processed': 'true'}
-    return jsonify(results)
-
-@app.route('/setg3', methods=['POST', 'GET'])
-def setg3():
-    data = request.get_json()
-    print (data)
-    session['g3_adjuster'] = int(data[0]['g3'])
-    print(session['g3_adjuster'])
-    results = {'processed': 'true'}
-    return jsonify(results)
-
-@app.route('/setg4', methods=['POST', 'GET'])
-def setg4():
-    data = request.get_json()
-    print (data)
-    session['g4_adjuster'] = int(data[0]['g4'])
-    print(session['g4_adjuster'])
-    results = {'processed': 'true'}
-    return jsonify(results)
 
 @app.route('/setfr', methods=['POST', 'GET'])
 def setfr():
@@ -1058,9 +908,45 @@ def setbl():
     return jsonify(results)
 
 
+
+@app.route('/setg1', methods=['POST', 'GET'])
+def setg1():
+    data = request.get_json()
+    session['g1_adjuster'] = int(data[0]['g1'])
+    print(session['g1_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg2', methods=['POST', 'GET'])
+def setg2():
+    data = request.get_json()
+    session['g2_adjuster'] = int(data[0]['g2'])
+    print(session['g2_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg3', methods=['POST', 'GET'])
+def setg3():
+    data = request.get_json()
+    session['g3_adjuster'] = int(data[0]['g3'])
+    print(session['g3_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+
+@app.route('/setg4', methods=['POST', 'GET'])
+def setg4():
+    data = request.get_json()
+    session['g4_adjuster'] = int(data[0]['g4'])
+    print(session['g4_adjuster'])
+    results = {'processed': 'true'}
+    return jsonify(results)
+    
+    
+    
+    
+    
 @app.route('/toggleMode', methods=['POST'])
 def toggle_mode():
-    
     #request.form for POST, not request.args!
     print (request.form)
     session['MODE'] = request.form.get('servo_mode')#data[0]['servo_mode']
@@ -1129,10 +1015,6 @@ def combo():
 
 
 
-
-
-
-
 @app.route('/getdirs', methods=['POST', 'GET'])
 def getdirs():
     #data = request.get_json()
@@ -1142,11 +1024,13 @@ def getdirs():
     print("JSONIFIED:", jsonify(listing))
     return jsonify(listing)
 
+
 @app.route('/getcombodirs', methods=['POST', 'GET'])
 def getcombodirs():
     listing = get_directory_listing("./motions8")
     print (jsonify(listing))
     return jsonify(listing)
+
 
 
 @app.route('/load', methods=['POST', 'GET'])
@@ -1187,14 +1071,9 @@ def save8():
     dirspath = './motions8/' + save_motion_combo_name + '/' + date + '/' 
     os.makedirs(dirspath)
 
-    np.savetxt(dirspath + "combo.txt", npArray, fmt="%s")
-
-#    file = open(dirspath + "combo.txt", "w+")
-#    content = str(npArray)
-#    file.write(content)
-#    file.close()
-
-
+    with open(dirspath + "combo.txt", "w") as file_name:
+        np.savetxt(file_name, npArray, fmt="%s")
+    
     return index()
 
 
@@ -1210,9 +1089,6 @@ def save():
     
     
     try:
-        print(session)
-        print(session['MODE'] is None)
-        print(session['MODE'] == "Four")
         four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
     except:
         session['MODE'] = "Four"
@@ -1270,94 +1146,114 @@ def save():
     back_right_list = [int(x) for x in back_right_list]
     back_left_list = [int(x) for x in back_left_list]
 
-    np.save(dirspath + 'angle_front_right_180.npy', front_right_list) 
-    np.save(dirspath + 'angle_front_left_180.npy', front_left_list) 
-    np.save(dirspath + 'angle_back_right_180.npy', back_right_list) 
-    np.save(dirspath + 'angle_back_left_180.npy', back_left_list) 
+    with open(dirspath + 'angle_front_right_180.npy', "wb") as f:
+        np.save(f, front_right_list) 
+    
+    with open(dirspath + 'angle_front_left_180.npy', "wb") as f:
+        np.save(f, front_left_list) 
+        
+    with open(dirspath + 'angle_back_right_180.npy', "wb") as f:
+        np.save(f, back_right_list) 
+
+    with open(dirspath + 'angle_back_left_180.npy', "wb") as f:
+        np.save(f, back_left_list) 
 
 
-    np.savetxt(dirspath + 'angle_front_right_180.txt', front_right_list, fmt='%d')
-    np.savetxt(dirspath + 'angle_front_left_180.txt', front_left_list, fmt='%d')
-    np.savetxt(dirspath + 'angle_back_right_180.txt', back_right_list, fmt='%d')
-    np.savetxt(dirspath + 'angle_back_left_180.txt', back_left_list, fmt='%d')
+    with open(dirspath + 'angle_front_right_180.txt', "w") as f:
+        np.savetxt(f, front_right_list, fmt='%d')
+    
+    with open(dirspath + 'angle_front_left_180.txt', "w") as f:
+        np.savetxt(f, front_left_list, fmt='%d')
+        
+    with open(dirspath + 'angle_back_right_180.txt', "w") as f:
+        np.savetxt(f, back_right_list, fmt='%d')
 
+    with open(dirspath + 'angle_back_left_180.txt', "w") as f:
+         np.savetxt(f, back_left_list, fmt='%d')
 
-
-
+  
     return index()
+
 
 
 @app.route('/fidget', methods=['POST', 'GET'])
 def fidget():
-#    data = request.get_json()
-#    front_right_update = data[0]
-#    front_left_update = data[1]
-#    back_right_update = data[2]
-#    back_left_update = data[3]
-#
-#    front_right = front_right_update['front_right']
-#    front_left = front_left_update['front_left']
-#    back_right = back_right_update['back_right']
-#    back_left = back_left_update['back_left']
-#    
-#    for i in range (6): 
-#        #adjust
-#        front_right = np.array(front_right)
-#        front_left = np.array(front_left)
-#        back_right = np.array(back_right)
-#        back_left = np.array(back_left)
-#    
-#        #too volatile
-#
-#        #if random.randint(0,1) == 1:
-#        #    front_right = 180 - front_right
-#        #if random.randint(0,1) == 1:
-#        #    front_left = 180 - front_left
-#        #if random.randint(0,1) == 1:
-#        #    back_right = 180 - back_right
-#        #if random.randint(0,1) == 1:
-#        #    back_left = 180 - back_left
-#    
-#    
-#        if random.randint(0,1) == 1:
-#            front_right = np.flip(front_right)
-#        if random.randint(0,1) == 1:
-#            front_left = np.flip(front_left)
-#        if random.randint(0,1) == 1:
-#            back_right = np.flip(back_right)
-#        if random.randint(0,1) == 1:
-#            back_left = np.flip(back_left)
-#   
-#
-#        front_right = front_right + int(session['front_right_adjuster'])
-#        front_left = front_left + int(session['front_left_adjuster'])
-#        back_right = back_right + int(session['back_right_adjuster'])
-#        back_left = back_left + int(session['back_left_adjuster'])
-#
-#        front_left = 180-front_left
-#        back_left = 180-back_left
-#
-#        results = {'processed': 'true'}
-#       
-#        NUM_TIMES = int(session['NUM_TIMES'])
-#        print(NUM_TIMES)
-#        r_front_right = np.tile(front_right, NUM_TIMES)
-#        r_front_left = np.tile(front_left, NUM_TIMES)
-#        r_back_right = np.tile(back_right, NUM_TIMES)
-#        r_back_left = np.tile(back_left, NUM_TIMES)
-#    
-#    
-#        for i in range(len(r_front_right)):
-#            servo0.angle = int(r_front_right[i])
-#            servo1.angle = int(r_front_left[i])
-#            servo2.angle = int(r_back_right[i])
-#            servo3.angle = int(r_back_left[i])
-#            
-#            DELAY = float(session['DELAY'])
-#            time.sleep(DELAY)
-#        
+
+    @copy_current_request_context
+    def runFidgetTask():
+        while True:
+            if stop_robot_event.is_set(): 
+                print(f'end {threading.current_thread().name} ')
+                return
+    
+    
+            path = './motions/'
+            children = []
+     
+            for name in os.listdir(path):
+                subpath = os.path.join(path, name)
+                if os.path.isdir(subpath):
+                    children.append(subpath)
+    
+            child = random.choice(children)
+            print("Running ", child)
+    
+            checkpoints = glob(child + '/*')
+            checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
+            sorted_saves = sorted(checkpoint_dirs,  reverse=True)
+    
+            adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+            front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
+            runadjustedmotiondirect([front_right, front_left, back_right, back_left], False, False)  # don't extract dict, don't run as thread
+    
+
+
+    stop_robot_event.clear()
+    t = Thread(target=runFidgetTask, args=(), daemon=True)  
+    t.start()
     results = {'processed': 'false'}
     return jsonify(results)
+
+
+
+def validate_motion(motions, adjuster_array):
+            
+    front_right = np.array(motions[0]) + int(adjuster_array[0])
+    front_left = np.array(motions[1]) + int(adjuster_array[1])
+    back_right = np.array(motions[2]) + int(adjuster_array[2])
+    back_left = np.array(motions[3]) + int(adjuster_array[3])
+                
+    front_right[front_right > 179] = 179
+    front_left[front_left > 179] = 179
+    back_right[back_right > 179] = 179
+    back_left[back_left > 179] = 179
+
+    front_right[front_right < 1] = 1
+    front_left[front_left < 1] = 1
+    back_right[back_right < 1] = 1
+    back_left[back_left < 1] = 1
+
+    front_left = 180-front_left
+    back_left = 180-back_left
+        
+    min_len = min(len(front_right), len(front_left), len(back_right), len(back_left))
+    min_len = min(min_len, 130)
+    front_right = front_right[:min_len]
+    front_left = front_left[:min_len]
+    back_right = back_right[:min_len]
+    back_left = back_left[:min_len]
+    
+    return front_right, front_left, back_right, back_left
+            
+
+def load_and_validate_motion(directory, adjuster_array):
+            
+    front_right = np.load(directory + '/angle_front_right_180.npy', allow_pickle=True)
+    front_left = np.load(directory + '/angle_front_left_180.npy', allow_pickle=True)
+    back_right = np.load(directory + '/angle_back_right_180.npy', allow_pickle=True)
+    back_left = np.load(directory + '/angle_back_left_180.npy', allow_pickle=True)
+
+    return validate_motion([front_right, front_left, back_right, back_left], adjuster_array)
 
 
 
@@ -1366,44 +1262,57 @@ def runBrain():
 
     @copy_current_request_context
     def runBrainTask():
+        
+        @copy_current_request_context
+        def runMotionLogic(TOO_CLOSE, L, F, R):
+
+            priority = 0
+            
+            # High Priority '0'
+            if F < TOO_CLOSE:
+                runMotionFromCategory("BACKWARDS")
+                priority = 1
+            if L < TOO_CLOSE:
+                runMotionFromCategory("RIGHT")
+                priority = 1
+            if R < TOO_CLOSE:
+                runMotionFromCategory("LEFT")
+                priority = 1
+            
+            # Medium Priority '1'  (priority is still 0)
+            if priority == 0 and L < R and L < F:
+                runMotionFromCategory("RIGHT")
+                priority = 2
+             
+            if priority == 0 and R < L and R < F:
+                runMotionFromCategory("LEFT")
+                priority = 2
+            
+            # Low Priority '2'  (priority is still 0)
+            if priority == 0 and L < F and R < F:
+                runMotionFromCategory("FORWARD")
+            
+            if priority == 0 and F > TOO_CLOSE:
+                runMotionFromCategory("FORWARD")
+            elif priority == 0 and F <= TOO_CLOSE:
+                runMotionFromCategory("BACKWARDS")
+
+
+
+
+        def poll_realsense():
+            response = requests.post(url=realsense_url)
+            print(response)
+            return response
+
+
+
 
         @copy_current_request_context
         def runMotionFromCategory(category):
-            #for random selection by category
-    
-            #path = './motions/'
-            #children = []
-    
-            #for name in os.listdir(path):
-            #    subpath = os.path.join(path, name)
-            #    if os.path.isdir(subpath) and category in subpath.upper():
-            #        children.append(subpath)
-    
-            #print(category, ':', children)
-    
-            #child = random.choice(children)
-    
-            #if child is None:
-            #    print("No Motions available for ", category)
-    
-            #print ('Running ', child)
-            #
-            #checkpoints = glob(child+'/*')
-            #print(checkpoints)
-        
-            #cleanedList = [x for x in checkpoints if os.path.isdir(x)]
-            #sorted_saves = sorted(cleanedList, key=lambda x: x[1], reverse=True) 
-        
-            #print(sorted_saves)
+
             try: 
-                #front_right = np.load(sorted_saves[0] + '/angle_front_right_180.npy', allow_pickle=True)
-                #front_left = np.load(sorted_saves[0] + '/angle_front_left_180.npy', allow_pickle=True)
-                #back_right = np.load(sorted_saves[0] + '/angle_back_right_180.npy', allow_pickle=True)
-                #back_left = np.load(sorted_saves[0] + '/angle_back_left_180.npy', allow_pickle=True)
 
-
-
-    
                 try:
                     four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
                 except:
@@ -1420,33 +1329,8 @@ def runBrain():
                     checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
                     sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
                     
-                    
-                    
-                    front_right = np.load(sorted_saves[0] + '/angle_front_right_180.npy', allow_pickle=True)
-                    front_left = np.load(sorted_saves[0] + '/angle_front_left_180.npy', allow_pickle=True)
-                    back_right = np.load(sorted_saves[0] + '/angle_back_right_180.npy', allow_pickle=True)
-                    back_left = np.load(sorted_saves[0] + '/angle_back_left_180.npy', allow_pickle=True)
-                    
-                    #adjust   add all, since subtracting lefts from 180 later.
-                    front_right = np.array(front_right) + int(session['front_right_adjuster'])
-                    front_left = np.array(front_left) + int(session['front_left_adjuster'])
-                    back_right = np.array(back_right) + int(session['back_right_adjuster'])
-                    back_left = np.array(back_left) + int(session['back_left_adjuster'])
-                    
-                    
-                    front_left = 180-front_left
-                    back_left = 180-back_left
-                    
-                                
-                    front_right[front_right > 179] = 179
-                    front_left[front_left > 179] = 179
-                    back_right[back_right > 179] = 179
-                    back_left[back_left > 179] = 179
-
-                    front_right[front_right < 1] = 1
-                    front_left[front_left < 1] = 1
-                    back_right[back_right < 1] = 1
-                    back_left[back_left < 1] = 1
+                    adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+                    front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
                     
                     if is_pca9685_robot:
                         for i in range(len(front_right)):
@@ -1494,31 +1378,9 @@ def runBrain():
                     checkpoints = glob(category_dir + '/*')
                     checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
                     sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
-                    
-                    
-                    front_right = np.load(sorted_saves[0] + '/angle_front_right_180.npy', allow_pickle=True)
-                    front_left = np.load(sorted_saves[0] + '/angle_front_left_180.npy', allow_pickle=True)
-                    back_right = np.load(sorted_saves[0] + '/angle_back_right_180.npy', allow_pickle=True)
-                    back_left = np.load(sorted_saves[0] + '/angle_back_left_180.npy', allow_pickle=True)
 
-                    
-                    front_right = np.array(front_right) + int(session['front_right_adjuster'])
-                    front_left = np.array(front_left) + int(session['front_left_adjuster'])
-                    back_right = np.array(back_right) + int(session['back_right_adjuster'])
-                    back_left = np.array(back_left) + int(session['back_left_adjuster'])
-                    
-                    front_right[front_right > 179] = 179
-                    front_left[front_left > 179] = 179
-                    back_right[back_right > 179] = 179
-                    back_left[back_left > 179] = 179
-
-                    front_right[front_right < 1] = 1
-                    front_left[front_left < 1] = 1
-                    back_right[back_right < 1] = 1
-                    back_left[back_left < 1] = 1
-                    
-                    front_left = 180-front_left
-                    back_left = 180-back_left
+                    adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+                    front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
                     
                     #gripper
                     
@@ -1527,29 +1389,8 @@ def runBrain():
                     checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
                     sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
 
-                    gripper_1 = np.load(sorted_saves[0] + '/angle_front_right_180.npy', allow_pickle=True)
-                    gripper_2 = np.load(sorted_saves[0] + '/angle_front_left_180.npy', allow_pickle=True)             
-                    gripper_3 = np.load(sorted_saves[0] + '/angle_back_right_180.npy', allow_pickle=True)
-                    gripper_4 = np.load(sorted_saves[0] + '/angle_back_left_180.npy', allow_pickle=True)
-            
-                    #adjust   add all, since subtracting lefts from 180 later.
-                    gripper_1 = np.array(gripper_1) + int(session['g1_adjuster'])
-                    gripper_2 = np.array(gripper_2) + int(session['g2_adjuster'])
-                    gripper_3 = np.array(gripper_3) + int(session['g3_adjuster'])
-                    gripper_4 = np.array(gripper_4) + int(session['g4_adjuster'])
-                    
-                    gripper_1[gripper_1 > 179] = 179
-                    gripper_2[gripper_2 > 179] = 179
-                    gripper_3[gripper_3 > 179] = 179
-                    gripper_4[gripper_4 > 179] = 179
-                   
-                    gripper_1[gripper_1 < 1] = 1
-                    gripper_2[gripper_2 < 1] = 1 
-                    gripper_3[gripper_3 < 1] = 1
-                    gripper_4[gripper_4 < 1] = 1
-                    
-                    gripper_2 = 180 - gripper_2
-                    gripper_4 = 180 - gripper_4
+                    adjusters = [session['g1_adjuster'], session['g2_adjuster'], session['g3_adjuster'], session['g4_adjuster']]
+                    gripper_1, gripper_2, gripper_3, gripper_4 = load_and_validate_motion(sorted_saves[0], adjusters)
                     
                     if is_pca9685_robot:
                         for i in range(len(front_right)):
@@ -1573,10 +1414,9 @@ def runBrain():
 
             except:
                 print(traceback.format_exc())
-                print("ERROR LOADING ", child) 
     
     
-    
+        #end runMotionFromCategory
     
 
         if (has_lidar):
@@ -1586,10 +1426,8 @@ def runBrain():
                     print(f'end {threading.current_thread().name} ')
                     return
 
-
                 try:
                     TOO_CLOSE = 0.2
-                    priority = 0
 
                     L = float(mem.retrieveState('L'))
                     F = float(mem.retrieveState('F'))
@@ -1597,38 +1435,7 @@ def runBrain():
 
                     print (L, " ", F, " ", R)
 
-
-                    # High Priority '0'
-                    if F < TOO_CLOSE:
-                        runMotionFromCategory("BACKWARDS")
-                        priority = 1
-                    if L < TOO_CLOSE:
-                        #runMotionFromCategory("BACK")
-                        runMotionFromCategory("RIGHT")
-                        priority = 1
-                    if R < TOO_CLOSE:
-                        #runMotionFromCategory("BACK")
-                        runMotionFromCategory("LEFT")
-                        priority = 1
-                    
-                    # Medium Priority '1'  (priority is still 0)
-                    if priority == 0 and L < R and L < F:
-                        runMotionFromCategory("RIGHT")
-                        priority = 2
-                     
-                    if priority == 0 and R < L and R < F:
-                        runMotionFromCategory("LEFT")
-                        priority = 2
-                    
-                    # Low Priority '2'  (priority is still 0)
-                    if priority == 0 and L < F and R < F:
-                        runMotionFromCategory("FORWARD")
-                    
-                    if priority == 0 and F > 100:
-                        runMotionFromCategory("FORWARD")
-                    elif priority == 0 and F < 50:
-                        runMotionFromCategory("BACKWARDS")
-
+                    runMotionLogic(TOO_CLOSE, L, F, R)
 
                 except:
                     print(traceback.format_exc())
@@ -1638,7 +1445,10 @@ def runBrain():
 
 
         elif (has_realsense):
-            poll_realsense()
+            response = poll_realsense()
+            #For realsense, the server advises direction
+            runMotionFromCategory(response)
+             
    
         elif (has_arduino_at_115200):
         
@@ -1648,8 +1458,6 @@ def runBrain():
                 if stop_robot_event.is_set():
                     print(f'end {threading.current_thread().name} ')
                     return
-        
-                priority = 0
                
                 read_json = poll_arduino()
                 try:
@@ -1661,39 +1469,8 @@ def runBrain():
                     results = {'processed': 'true'}
                     return jsonify(results)
             
-            
-            
-                # High Priority '0'
-                if F < TOO_CLOSE:
-                    runMotionFromCategory("BACKWARDS")
-                    priority = 1
-                if L < TOO_CLOSE:
-                    #runMotionFromCategory("BACK")
-                    runMotionFromCategory("RIGHT")
-                    priority = 1
-                if R < TOO_CLOSE:
-                    #runMotionFromCategory("BACK")
-                    runMotionFromCategory("LEFT")
-                    priority = 1
+                runMotionLogic(TOO_CLOSE, L, F, R)
                 
-                # Medium Priority '1'  (priority is still 0)
-                if priority == 0 and L < R and L < F:
-                    runMotionFromCategory("RIGHT")
-                    priority = 2
-                 
-                if priority == 0 and R < L and R < F:
-                    runMotionFromCategory("LEFT")
-                    priority = 2
-                
-                # Low Priority '2'  (priority is still 0)
-                if priority == 0 and L < F and R < F:
-                    runMotionFromCategory("FORWARD")
-                
-                if priority == 0 and F > 100:
-                    runMotionFromCategory("FORWARD")
-                elif priority == 0 and F < 50:
-                    runMotionFromCategory("BACKWARDS")
-
 
     stop_robot_event.clear()
     t = Thread(target=runBrainTask, args=(), daemon=True)  #check the syntax
@@ -1709,11 +1486,11 @@ def runBrain():
 @app.route('/runadjustedmotion', methods=['POST', 'GET'])
 def runadjustedmotion():
     data = request.get_json()
-    return runadjustedmotiondirect(data)
+    return runadjustedmotiondirect(data, True, True)
 
-def runadjustedmotiondirect(data):
+def runadjustedmotiondirect(data, needs_to_extract, as_thread):
     @copy_current_request_context
-    def runMotionTask(data):
+    def runMotionTask(data, needs_to_extract):
     
         front_right_update = data[0]
         front_left_update = data[1]
@@ -1741,78 +1518,44 @@ def runadjustedmotiondirect(data):
             gripper_2_update = front_left_update
             gripper_3_update = back_right_update
             gripper_4_update = back_left_update 
-    
-        front_right = front_right_update['front_right']
-        front_left = front_left_update['front_left']
-        back_right = back_right_update['back_right']
-        back_left = back_left_update['back_left']
-    
-        #adjust   - add them cause we're subtracting from 180 later.
-        front_right = np.array(front_right) + int(session['front_right_adjuster'])
-        front_left = np.array(front_left) + int(session['front_left_adjuster'])
-        back_right = np.array(back_right) + int(session['back_right_adjuster'])
-        back_left = np.array(back_left) + int(session['back_left_adjuster'])
    
-        front_right[front_right > 179] = 179
-        front_left[front_left > 179] = 179
-        back_right[back_right > 179] = 179
-        back_left[back_left > 179] = 179
+        if needs_to_extract:
+            front_right = front_right_update['front_right']
+            front_left = front_left_update['front_left']
+            back_right = back_right_update['back_right']
+            back_left = back_left_update['back_left']
+        else:
+            front_right = front_right_update
+            front_left = front_left_update
+            back_right = back_right_update
+            back_left = back_left_update
 
-        front_right[front_right < 1] = 1
-        front_left[front_left < 1] = 1
-        back_right[back_right < 1] = 1
-        back_left[back_left < 1] = 1
-
-
-        print(len(front_right), " ",  len(front_left), " ", len(back_right), " ", len(back_left))
-        min_len = min(len(front_right), len(front_left), len(back_right), len(back_left))
-        front_right = front_right[:min_len]
-        front_left = front_left[:min_len]
-        back_right = back_right[:min_len]
-        back_left = back_left[:min_len]
-        print(len(front_right), " ",  len(front_left), " ", len(back_right), " ", len(back_left))
-
-
-        if not four_servo_mode:
-            gripper_1 = gripper_1_update['gripper_1']
-            gripper_2 = gripper_2_update['gripper_2']
-            gripper_3 = gripper_3_update['gripper_3']
-            gripper_4 = gripper_4_update['gripper_4']
-            #adjust   - add them cause we're subtracting from 180 later.
-            gripper_1 = np.array(gripper_1) + int(session['g1_adjuster'])
-            gripper_2 = np.array(gripper_2) + int(session['g2_adjuster'])
-            gripper_3 = np.array(gripper_3) + int(session['g3_adjuster'])
-            gripper_4 = np.array(gripper_4) + int(session['g4_adjuster'])
-   
-            gripper_1[gripper_1 > 179] = 179
-            gripper_2[gripper_2 > 179] = 179
-            gripper_3[gripper_3 > 179] = 179
-            gripper_4[gripper_4 > 179] = 179
     
-            gripper_1[gripper_1 < 1] = 1
-            gripper_2[gripper_2 < 1] = 1 
-            gripper_3[gripper_3 < 1] = 1
-            gripper_4[gripper_4 < 1] = 1
-       
+        motions = [front_right, front_left, back_right, back_left]
+        adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+        front_right, front_left, back_right, back_left = validate_motion(motions, adjusters)
+            
         NUM_TIMES = int(session['NUM_TIMES'])
         r_front_right = np.tile(front_right, NUM_TIMES)
         r_front_left = np.tile(front_left, NUM_TIMES)
         r_back_right = np.tile(back_right, NUM_TIMES)
         r_back_left = np.tile(back_left, NUM_TIMES)
-   
-        #maybe make these configurable, cause you could set up the servo backwards
-        r_front_left = 180-r_front_left
-        r_back_left = 180-r_back_left
-   
+      
          
-    
         if not four_servo_mode:
+            gripper_1 = gripper_1_update['gripper_1']
+            gripper_2 = gripper_2_update['gripper_2']
+            gripper_3 = gripper_3_update['gripper_3']
+            gripper_4 = gripper_4_update['gripper_4']
+
+            motions = [gripper_1, gripper_2, gripper_3, gripper_4]
+            adjusters = [session['g1_adjuster'], session['g2_adjuster'], session['g3_adjuster'], session['g4_adjuster']]
+            gripper_1, gripper_2, gripper_3, gripper_4 = validate_motion(motions, adjusters)
+
             gripper_1 = np.tile(gripper_1, NUM_TIMES)
             gripper_2 = np.tile(gripper_2, NUM_TIMES)
             gripper_3 = np.tile(gripper_3, NUM_TIMES)
             gripper_4 = np.tile(gripper_4, NUM_TIMES)
-            gripper_2 = 180 - gripper_2
-            gripper_4 = 180 - gripper_4
     
         if is_pca9685_robot: 
             for i in range(len(r_front_right)):
@@ -1889,8 +1632,11 @@ def runadjustedmotiondirect(data):
                 time.sleep(DELAY)
 
     stop_robot_event.clear()
-    t = Thread(target=runMotionTask, args=(data,), daemon=True)  
-    t.start()
+    if as_thread:
+        t = Thread(target=runMotionTask, args=(data, needs_to_extract), daemon=True)  
+        t.start()
+    else:
+        runMotionTask(data, needs_to_extract)
     
     results = {'processed': 'true'}
 
@@ -1925,14 +1671,21 @@ def save_image():
     if has_picamera:
         timestr = time.strftime("%Y%m%d-%H%M%S")
         lastfile = "static/snap_" + timestr + ".jpg"
-        camera = picamera.PiCamera()
-        camera.resolution = (640, 480)
-        camera.start_preview()
+        cam = picamera.PiCamera()
+        cam.resolution = (640, 480)
+        cam.start_preview()
         sleep(2)
-        camera.capture(lastfile)
-        camera.stop_preview()
+        cam.capture(lastfile)
+        cam.stop_preview()
+        cam.close()
+    elif has_libcamera:
+        print("Capture still")
+        camera = Picamera2()
+        camera.start_preview(Preview.NULL)
+        camera.still_configuration.size = (800, 600)
+        lastfile = capture(camera)
+        print(lastfile)
         camera.close()
-    
     return(lastfile)
 
 
@@ -1940,17 +1693,6 @@ def save_image():
 def snapshot():
     return send_file(save_image())
 
-@app.route("/snapshot2")
-def getImage():
-    if has_picamera:
-        camera.capture(lastfile)
-        camera.close()
-
-    return send_file(lastfile)
-
-
 
 if __name__ == '__main__':
-    #executor = Executor(app)
     socketio.run(app, debug=True, host='0.0.0.0')
-    #app.run(debug=True, host='0.0.0.0')

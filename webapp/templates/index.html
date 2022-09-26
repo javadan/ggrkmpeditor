@@ -310,9 +310,11 @@
 
 	<td>
 
-	     <img id="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA == 1 }}">
-
+	<div id="imgdiv">
+	     <img id="refresh" name="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA == 1 }}">
+        </div>
 	     <input type="button" name="toggleCameraRefresh" id="toggleCameraRefresh" value="CAMERA ON/OFF" onclick="toggleCamera();" />	
+	     <input type="button" name="takePic" id="takePic" value="TAKE NEW PICTURE" onclick="snapshot()" />	
 
 
 		<table>
@@ -574,7 +576,8 @@
 		<button onclick="stop()">KILL SWITCH</button>
 		<button onclick="settoadjusters()">SET ANGLES to 90 + Adjusters</button>
 		<br/>
-	<!--	<button onclick="fiddleAroundAdjusted()">FIDGET TO THE WAVES</button> -->
+		<button onclick="fiddleAroundAdjusted()">FIDGET TO THE WAVES</button> 
+		<button onclick="trysomevariant()">RANDOM SHUFFLED VARIANT</button> 
 		<button onclick="runBrain()">TURN ON BRAIN</button>
 	
 	 <div class="container">
@@ -661,6 +664,41 @@ function toggleCamera() {
     
 }
 
+function trysomevariant() {
+
+
+
+ if (Math.random() < 0.5) {shuffleServos();}
+ if (Math.random() < 0.5) {vflip(0);}
+ if (Math.random() < 0.5) {vflip(1);}
+ if (Math.random() < 0.5) {vflip(2);}
+ if (Math.random() < 0.5) {vflip(3);}
+ if (Math.random() < 0.5) {hflip(0);}
+ if (Math.random() < 0.5) {hflip(1);}
+ if (Math.random() < 0.5) {hflip(2);}
+ if (Math.random() < 0.5) {hflip(3);}
+
+ var saveData = [{"front_right":datasetValues.data.datasets[0].data},
+                 {"front_left":datasetValues.data.datasets[1].data},
+                 {"back_right":datasetValues.data.datasets[2].data},
+                 {"back_left":datasetValues.data.datasets[3].data}];
+
+
+ $.ajax({
+   type: "POST",
+   url: "/runadjustedmotion",
+   data: JSON.stringify(saveData),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+  });
+
+}
+
+
+
 
 function fiddleAroundAdjusted() {
     console.log("FIDGETING...");
@@ -705,7 +743,8 @@ function runBrain() {
 function snapshot() {
     console.log("SNAPSHOT");
     $.get( {{ request.script_root|tojson|safe }} + '/snapshot', function( data ) {
-    console.log(data);
+//    console.log(data);
+    document.getElementById("imgdiv").innerHTML="<img id=\"refresh\" name=\"refresh\" src=\"{{ url_for('snapshot') if leg_data.CAMERA == 1 }}\">"
     })
 }
 
