@@ -6,8 +6,10 @@ from flask_executor import Executor
 import eventlet
 from eventlet import wsgi
 from eventlet import websocket
-from threading import Thread, Event, Lock
+eventlet.monkey_patch()
+from threading import Thread, Event, Lock, Condition
 import threading
+_threading = eventlet.patcher.original('threading')
 
 import math
 import serial
@@ -28,7 +30,7 @@ import traceback
 import io
 from time import strftime, sleep
 import time
-
+import logging
 
     
 is_pca9685_robot = config.settings['pca9685_robot']
@@ -39,9 +41,11 @@ has_realsense = config.settings['realsense']
 realsense_url = config.settings['realsense_url']
 has_picamera = config.settings['picamera']
 has_libcamera = config.settings['libcamera']
+#is_streaming_libcamera = config.settings['streaming']
+has_ultrasound_echo_on_pin_22 = config.settings['ultrasound_echo_on_pin_22']
+has_ultrasound_trigger_on_pin_27 = config.settings['ultrasound_trigger_on_pin_27']
 has_continuous_servo_on_pin_25 = config.settings['continuous_servo_on_pin_25']
 has_switches_on_pins_23_34 = config.settings['has_switches_on_pins_23_34']
-    
 
 
 
@@ -54,9 +58,57 @@ print('Realsense:',  has_realsense)
 print('Realsense URL:',  realsense_url)
 print('Has picamera (Legacy RPi 32 bit):',  has_picamera)
 print('Has libcamera (RPi 64 bit):',  has_libcamera)
+#print('(TODO)Is streaming libcamera MJPEG (RPi 64 bit):',  is_streaming_libcamera)
+print('Ultrasound sensor echo on pin 22:',  has_ultrasound_echo_on_pin_22)
+print('Ultrasound sensor trigger on pin 27:',  has_ultrasound_trigger_on_pin_27)
 #gripper
 print('Has continuous servo on pin 25:',  has_continuous_servo_on_pin_25)
 print('Has switches on pin 23/24:',  has_switches_on_pins_23_34)
+
+if has_ultrasound_echo_on_pin_22 and has_ultrasound_trigger_on_pin_27:
+    import board
+    import RPi.GPIO as GPIO           
+
+    from memory import Memory
+    mem = Memory()
+
+    def distance():
+        GPIO_TRIGGER = 27
+        GPIO_ECHO = 22
+
+        GPIO.output(GPIO_TRIGGER, True)
+        time.sleep(0.00001)
+        GPIO.output(GPIO_TRIGGER, False)
+     
+        StartTime = time.time()
+        StopTime = time.time()
+     
+        while GPIO.input(GPIO_ECHO) == 0:
+            StartTime = time.time()
+     
+        while GPIO.input(GPIO_ECHO) == 1:
+            StopTime = time.time()
+     
+        TimeElapsed = StopTime - StartTime
+        # multiply with the sonic speed (34300 cm/s)
+        # and divide by 2, because there and back
+        distance = (TimeElapsed * 34300) / 2
+     
+        return distance
+
+    def background_ultrasound_thread():
+        GPIO_TRIGGER = 27
+        GPIO_ECHO = 22
+
+        GPIO.setmode(GPIO.BCM)     
+        GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
+        GPIO.setup(GPIO_ECHO, GPIO.IN) 
+        while True:
+            dist = distance()
+            mem.storeState("F", dist)
+            time.sleep(2)
+
+
 
 if has_continuous_servo_on_pin_25:
     import board
@@ -69,7 +121,7 @@ if has_continuous_servo_on_pin_25:
 
     GPIO.setmode(GPIO.BCM)     
     GPIO.setup(23, GPIO.IN)  
-    GPIO.setup(24, GPIO.IN) 
+    GPIO.setup(24, GPIO.IN)  
     
  
      #if GPIO.input(23) or GPIO.input(24): 
@@ -100,6 +152,11 @@ if has_libcamera:
 
         return file_path
     
+
+
+
+
+
 if is_pca9685_robot:
     from adafruit_motor import servo
     from adafruit_pca9685 import PCA9685
@@ -345,8 +402,11 @@ thread_lock = Lock()
 #for stopping the robot between http requests
 stop_robot_event = Event()
 
+ultrasound_thread = None
+ultrasound_thread_lock = Lock()
+ultrasound_stop_event = Event()
 
-
+stop_images_event = Event()
 
 
 
@@ -360,12 +420,6 @@ DELAY = 0.005
 SHIFT_VAL = 0
 CAMERA = 1
 
-
-#SCS1_ID = 1
-#SCS2_ID = 2
-#SCS3_ID = 3
-#SCS4_ID = 4
-#ADDR_SCS_TORQUE_ENABLE     = 40
 
 def shutdown_scservo(SC_ID):
 
@@ -381,11 +435,13 @@ def shutdown_scservo(SC_ID):
 def close_running_threads():
     if is_pca9685_robot:
         pca.deinit()
+
     if has_lidar:
         lidar.stop()
         lidar.stop_motor()
         lidar.disconnect()
         #client.close()
+
     if is_scservo_robot:
         # Clear syncread parameter storage
         groupSyncRead.clearParam()
@@ -397,6 +453,9 @@ def close_running_threads():
         
         # Close port
         portHandler.closePort()
+
+    if has_ultrasound_trigger_on_pin_27 and has_ultrasound_echo_on_pin_22:
+        ultrasound_thread.join()
 
 #Register the function to be called on exit
 atexit.register(close_running_threads)
@@ -416,6 +475,11 @@ def connect():
     else:
         emit('server_info', {'data': '... No Lidar Connected.'})
 
+    if has_ultrasound_trigger_on_pin_27 and has_ultrasound_echo_on_pin_22:
+        global ultrasound_thread
+        with ultrasound_thread_lock:
+            if ultrasound_thread is None:
+                ultrasound_thread = socketio.start_background_task(background_ultrasound_thread)
 
 
 @socketio.event
@@ -441,6 +505,15 @@ def index():
 
     if not has_picamera and not has_libcamera:
         session['CAMERA'] = 0
+
+    if 'CAMERA_TYPE' not in session:
+        if has_picamera:
+            session['CAMERA_TYPE'] = 'picamera'
+        elif has_libcamera:
+            session['CAMERA_TYPE'] = 'picamera2'
+        else:
+            session['CAMERA_TYPE'] = 'none'
+
 
     if 'MOTION' not in session:
         session['MOTION'] = 'walk'
@@ -619,6 +692,7 @@ def index():
            "SHIFT_VAL"  :session['SHIFT_VAL'],
            "DELAY_VAL"  :session['DELAY'],
            "CAMERA"     :session['CAMERA'],
+           "CAMERA_TYPE":session['CAMERA_TYPE'],
            "FORWARD"    :session['FORWARD'],
            "BACKWARDS"  :session['BACKWARDS'],
            "LEFT"       :session['LEFT'],
@@ -1497,7 +1571,7 @@ def runadjustedmotiondirect(data, needs_to_extract, as_thread):
         back_right_update = data[2]
         back_left_update = data[3]
         
-        
+#        print(front_right_update) 
         try:
             print(session)
             four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
@@ -1584,7 +1658,8 @@ def runadjustedmotiondirect(data, needs_to_extract, as_thread):
                 if stop_robot_event.is_set(): 
                     print(f'end {threading.current_thread().name} ')
                     return
-   
+ 
+                
                 #need to map 0-2048 low and high to 0 to 180
                 
                 servo0_angle = int(remap(int(r_front_right[index]), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
@@ -1664,13 +1739,49 @@ def get_directory_listing(path):
     return children
 
 
+@app.route('/images_kill_switch', methods=['POST', 'GET'])
+def images_kill_switch():
+    stop_images_event.set()
+    results = {'processed': 'true'}
+
+    return jsonify(results)
+
+@app.route('/pics_thread', methods=['POST', 'GET'])
+def takePicsWhenMovementDetected():
+    
+    @copy_current_request_context
+    def runImagesTask():
+        while True: 
+
+            if stop_images_event.is_set():
+                print(f'end {threading.current_thread().name} ')
+                return
+               
+            F_val = mem.retrieveState('F')
+
+            print(F_val)
+            F = float(F_val)
+            print(F)
+            if (F < 150): 
+                socketio.emit('server_info', {'data': 'Detection!'})
+            
+            time.sleep(5)
+                
+    stop_images_event.clear()
+    t = Thread(target=runImagesTask, args=(), daemon=True)  
+    t.start()
+
+    results = {'processed': 'true'}
+    return jsonify(results)
 
 lastfile = "static/1.jpg"
 
+
 def save_image():
+    print("Capture still")
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    lastfile = "static/snap_" + timestr + ".jpg"
     if has_picamera:
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        lastfile = "static/snap_" + timestr + ".jpg"
         cam = picamera.PiCamera()
         cam.resolution = (640, 480)
         cam.start_preview()
@@ -1679,13 +1790,19 @@ def save_image():
         cam.stop_preview()
         cam.close()
     elif has_libcamera:
-        print("Capture still")
-        camera = Picamera2()
-        camera.start_preview(Preview.NULL)
-        camera.still_configuration.size = (800, 600)
-        lastfile = capture(camera)
-        print(lastfile)
-        camera.close()
+
+        picam2 = Picamera2()
+        config = picam2.create_still_configuration(main={"size": (640,480)})
+        picam2.configure(config)
+        picam2.start()
+        
+        np_array = picam2.capture_array()
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        lastfile = "static/snap_" + timestr + ".jpg"
+        picam2.capture_file(lastfile)
+        picam2.stop()
+        picam2.close()
+    
     return(lastfile)
 
 
@@ -1693,6 +1810,21 @@ def save_image():
 def snapshot():
     return send_file(save_image())
 
+#Not functional yet
+@app.route('/socketsnapshot')
+def socketsnapshot():
+    picam2 = Picamera2()
+    config = picam2.create_still_configuration(main={"size": (640,480)})
+    picam2.configure(config)
+    picam2.start()
+    
+    np_array = picam2.capture_array()
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    lastfile = "static/snap_" + timestr + ".jpg"
+    picam2.capture_file(lastfile)
+    picam2.stop()
+    picam2.close()
+    socketio.emit('my-image-event', {'image_data': np_array.tolist()})
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0')

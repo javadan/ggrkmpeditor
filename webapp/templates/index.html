@@ -31,6 +31,19 @@
 		if (msg.data === "Disconnected!") {
 		    emit("disconnection_request");
 		}
+		else if (msg.data === "Detection!") {
+                    decideSnapshot();
+		}
+            });
+
+            socket.on('my-image-event', function(msg) {
+                $('#log').append(msg.image_data);
+                var arrayBufferView = new Uint8Array(msg.image_data);
+                var blob = new Blob( [ arrayBufferView ], { type: "image/jpeg" } );
+
+                var img_url = URL.createObjectURL(blob);
+
+                document.getElementById("refresh").src = img_url;
             });
 
 //            const degrees_to_radians = deg => (deg * Math.PI) / 180.0;
@@ -311,10 +324,12 @@
 	<td>
 
 	<div id="imgdiv">
-	     <img id="refresh" name="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA == 1 }}">
+	     <img id="refresh" name="refresh" src="{{ url_for('snapshot') if leg_data.CAMERA_TYPE == 'picamera' and leg_data.CAMERA == 1 }}"/>
         </div>
 	     <input type="button" name="toggleCameraRefresh" id="toggleCameraRefresh" value="CAMERA ON/OFF" onclick="toggleCamera();" />	
-	     <input type="button" name="takePic" id="takePic" value="TAKE NEW PICTURE" onclick="snapshot()" />	
+	     <input type="button" name="takePic" id="takePic" value="TAKE NEW PICTURE" onclick="decideSnapshot()" />	
+	     <input type="button" name="takePicsWhenMovement" id="takePicsWhenMovement" value="TAKE PICTURES WHEN MOVEMENT" onclick="takePicsWhenMovement()" />	
+	     <input type="button" name="stopTakingPics" id="stopTakingPics" value="STOP TAKING PICTURES" onclick="imagesKillSwitch()" />	
 
 
 		<table>
@@ -740,12 +755,60 @@ function runBrain() {
 
 }
 
+function decideSnapshot() {
+    console.log("DECIDING HOW TO SNAPSHOT");
+
+  //  if (IS_PICAMERA) {
+	snapshot();
+  //  }
+ //   else if (IS_LIBCAMERA) {
+//	socketsnapshot();
+ //   }
+}
+
 function snapshot() {
     console.log("SNAPSHOT");
     $.get( {{ request.script_root|tojson|safe }} + '/snapshot', function( data ) {
-//    console.log(data);
     document.getElementById("imgdiv").innerHTML="<img id=\"refresh\" name=\"refresh\" src=\"{{ url_for('snapshot') if leg_data.CAMERA == 1 }}\">"
     })
+}
+
+//not functioning currently.
+function socketsnapshot() {
+    console.log("SOCKET SNAPSHOT");
+    $.get( {{ request.script_root|tojson|safe }} + '/socketsnapshot', function( data ) {
+    })
+}
+
+function imagesKillSwitch()
+{
+
+    console.log("TURNING OFF IMAGES ON DETECTION...");
+ $.ajax({
+   type: "POST",
+   url: "/images_kill_switch",
+   data: {},
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+}
+
+function takePicsWhenMovement() {
+    console.log("TURNING ON IMAGES ON DETECTION...");
+    
+ $.ajax({
+   type: "POST",
+   url: "/pics_thread",
+   data: {},
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
 }
 
 document.querySelector('#push').onclick = function(){
@@ -823,6 +886,10 @@ var TIMES_VAL = {{leg_data.TIMES_VAL}};
 var DELAY_VAL = {{leg_data.DELAY_VAL}};
 var SHIFT_VAL = {{leg_data.SHIFT_VAL}};
 var CAMERA_REFRESH = {{leg_data.CAMERA}};
+
+var CAMERA_TYPE = "{{leg_data.CAMERA_TYPE}}";
+var IS_PICAMERA = CAMERA_TYPE === "picamera";
+var IS_LIBCAMERA = CAMERA_TYPE === "picamera2";
 
 
 var FORWARD_VAL = "{{leg_data.FORWARD}}";
@@ -1690,6 +1757,7 @@ function load() {
 
 
 function runadjusted() {
+		console.log("Running motion");
  var saveData = [{"front_right":datasetValues.data.datasets[0].data},
                  {"front_left":datasetValues.data.datasets[1].data},
                  {"back_right":datasetValues.data.datasets[2].data},
