@@ -35,6 +35,7 @@ import logging
     
 is_pca9685_robot = config.settings['pca9685_robot']
 is_scservo_robot = config.settings['scservo_robot'] # < for Feetech Smart bus servos (SMT, RS485)
+is_gpio_robot = config.settings['gpio_on_5_6_13_19_robot'] # corresponding to servos 1,2,3,4
 has_lidar = config.settings['lidar']
 has_arduino_at_115200 = config.settings['arduino_115200']
 has_realsense = config.settings['realsense']
@@ -52,6 +53,7 @@ has_switches_on_pins_23_34 = config.settings['has_switches_on_pins_23_34']
 
 print('PCA9685 Robot:', is_pca9685_robot)
 print('SCServo Robot:',  is_scservo_robot)
+print('GPIO Robot:',  is_gpio_robot)
 print('Lidar:',  has_lidar)
 print('Arduino:',  has_arduino_at_115200)
 print('Realsense:',  has_realsense)
@@ -154,6 +156,37 @@ if has_libcamera:
     
 
 
+
+
+if is_gpio_robot:
+    from adafruit_motor import servo
+    import board
+    import pigpio
+   
+    servo0 = 5
+    servo1 = 6
+    servo2 = 13
+    servo3 = 19
+
+    pwm0 = pigpio.pi()
+    pwm0.set_mode(servo0, pigpio.OUTPUT)
+    pwm1 = pigpio.pi()
+    pwm1.set_mode(servo1, pigpio.OUTPUT)
+    pwm2 = pigpio.pi()
+    pwm2.set_mode(servo2, pigpio.OUTPUT)
+    pwm3 = pigpio.pi()
+    pwm3.set_mode(servo3, pigpio.OUTPUT)
+
+    pwm0.set_PWM_frequency( servo0, 50 )
+    pwm1.set_PWM_frequency( servo1, 50 )
+    pwm2.set_PWM_frequency( servo2, 50 )
+    pwm3.set_PWM_frequency( servo3, 50 )
+
+    def remap(x, in_min, in_max, out_min, out_max):
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+    def remap_to_pwm(x):
+        return remap(x, 0, 179, 1000, 2000);
 
 
 
@@ -367,7 +400,9 @@ if has_arduino_at_115200:
     poll_arduino()
     
     
-    
+
+
+
 if is_pca9685_robot:
     i2c = busio.I2C(SCL, SDA)
     
@@ -435,6 +470,12 @@ def shutdown_scservo(SC_ID):
 def close_running_threads():
     if is_pca9685_robot:
         pca.deinit()
+
+    if is_gpio_robot:
+        pwm0.set_PWM_dutycycle( servo0, 0 )
+        pwm1.set_PWM_frequency( servo1, 0 )
+        pwm2.set_PWM_frequency( servo2, 0 )
+        pwm3.set_PWM_frequency( servo3, 0 )
 
     if has_lidar:
         lidar.stop()
@@ -738,7 +779,15 @@ def setSCServoPosition(SCS_ID, servo_angle):
 
 @app.route('/settoadjusters', methods=['POST', 'GET'])
 def settoadjusters():
-    if is_pca9685_robot:
+
+    if is_gpio_robot:
+        pwm0.set_servo_pulsewidth(servo0, remap_to_pwm(90 + session['front_right_adjuster']))
+        pwm1.set_servo_pulsewidth(servo1, remap_to_pwm(90 - session['front_left_adjuster']))
+        pwm2.set_servo_pulsewidth(servo2, remap_to_pwm(90 + session['back_right_adjuster']))
+        pwm3.set_servo_pulsewidth(servo3, remap_to_pwm(90 - session['back_left_adjuster']))
+
+
+    elif is_pca9685_robot:
         servo0.angle = 90 + session['front_right_adjuster']
         servo1.angle = 90 - session['front_left_adjuster']
         servo2.angle = 90 + session['back_right_adjuster']
@@ -748,7 +797,7 @@ def settoadjusters():
         servo6.angle = 90 + session['g3_adjuster']
         servo7.angle = 90 - session['g4_adjuster']
 
-    if is_scservo_robot:
+    elif is_scservo_robot:
         #Only handles 4 servos for Feetech robots
                 
         servo0_angle = int(remap(90 + int(session['front_right_adjuster']), 0, 180, SCS_MINIMUM_POSITION_VALUE, SCS_MAXIMUM_POSITION_VALUE))
@@ -778,7 +827,18 @@ def stop():
 
     stop_robot_event.set()
 
-    if is_pca9685_robot:
+    if is_gpio_robot:
+        try:
+            pwm0.set_servo_pulsewidth(servo0, remap_to_pwm(90 + session['front_right_adjuster']))
+            pwm1.set_servo_pulsewidth(servo1, remap_to_pwm(90 - session['front_left_adjuster']))
+            pwm2.set_servo_pulsewidth(servo2, remap_to_pwm(90 + session['back_right_adjuster']))
+            pwm3.set_servo_pulsewidth(servo3, remap_to_pwm(90 - session['back_left_adjuster']))
+        except:
+            pwm0.set_servo_pulsewidth(servo0, remap_to_pwm(90))
+            pwm1.set_servo_pulsewidth(servo1, remap_to_pwm(90))
+            pwm2.set_servo_pulsewidth(servo2, remap_to_pwm(90))
+            pwm3.set_servo_pulsewidth(servo3, remap_to_pwm(90))
+    elif is_pca9685_robot:
         try:
             #Set to default positions
             servo0.angle = 90 + session['front_right_adjuster']
@@ -1406,6 +1466,19 @@ def runBrain():
                     adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
                     front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
                     
+                    if is_gpio_robot:
+                        for i in range(len(front_right)):
+                            if stop_robot_event.is_set(): 
+                                print(f'end {threading.current_thread().name} ')
+                                return
+                    
+                            pwm0.set_servo_pulsewidth(servo0, remap_to_pwm(int(front_right[i])))
+                            pwm1.set_servo_pulsewidth(servo1, remap_to_pwm(int(front_left[i])))
+                            pwm2.set_servo_pulsewidth(servo2, remap_to_pwm(int(back_right[i])))
+                            pwm3.set_servo_pulsewidth(servo3, remap_to_pwm(int(back_left[i])))
+                            
+                            DELAY = float(session['DELAY'])
+                            time.sleep(DELAY)
                     if is_pca9685_robot:
                         for i in range(len(front_right)):
                             if stop_robot_event.is_set(): 
@@ -1466,7 +1539,20 @@ def runBrain():
                     adjusters = [session['g1_adjuster'], session['g2_adjuster'], session['g3_adjuster'], session['g4_adjuster']]
                     gripper_1, gripper_2, gripper_3, gripper_4 = load_and_validate_motion(sorted_saves[0], adjusters)
                     
-                    if is_pca9685_robot:
+                    if is_gpio_robot:
+                        for i in range(len(front_right)):
+                            if stop_robot_event.is_set(): 
+                                print(f'end {threading.current_thread().name} ')
+                                return
+                            pwm0.set_servo_pulsewidth(servo0, remap_to_pwm(int(front_right[i])))
+                            pwm1.set_servo_pulsewidth(servo1, remap_to_pwm(int(front_left[i])))
+                            pwm2.set_servo_pulsewidth(servo2, remap_to_pwm(int(back_right[i])))
+                            pwm3.set_servo_pulsewidth(servo3, remap_to_pwm(int(back_left[i])))
+                            
+                            DELAY = float(session['DELAY'])
+                            time.sleep(DELAY)
+
+                    elif is_pca9685_robot:
                         for i in range(len(front_right)):
                             if stop_robot_event.is_set(): 
                                 print(f'end {threading.current_thread().name} ')
@@ -1476,7 +1562,6 @@ def runBrain():
                             servo1.angle = int(front_left[i])
                             servo2.angle = int(back_right[i])
                             servo3.angle = int(back_left[i])
-                            
                             servo4.angle = int(gripper_1[i])
                             servo5.angle = int(gripper_2[i])
                             servo6.angle = int(gripper_3[i])
@@ -1631,13 +1716,25 @@ def runadjustedmotiondirect(data, needs_to_extract, as_thread):
             gripper_3 = np.tile(gripper_3, NUM_TIMES)
             gripper_4 = np.tile(gripper_4, NUM_TIMES)
     
-        if is_pca9685_robot: 
+        if is_gpio_robot:
+            for i in range(len(r_front_right)):
+                if stop_robot_event.is_set(): 
+                    print(f'end {threading.current_thread().name} ')
+                    return
+                pwm0.set_servo_pulsewidth(servo0, remap_to_pwm(int(r_front_right[i])))
+                pwm1.set_servo_pulsewidth(servo1, remap_to_pwm(int(r_front_left[i])))
+                pwm2.set_servo_pulsewidth(servo2, remap_to_pwm(int(r_back_right[i])))
+                pwm3.set_servo_pulsewidth(servo3, remap_to_pwm(int(r_back_left[i])))
+                            
+                DELAY = float(session['DELAY'])
+                time.sleep(DELAY)
+
+        elif is_pca9685_robot:
             for i in range(len(r_front_right)):
                 if stop_robot_event.is_set(): 
                     print(f'end {threading.current_thread().name} ')
                     return
    
-                #print(i)
                 servo0.angle = int(r_front_right[i])
                 servo1.angle = int(r_front_left[i])
                 servo2.angle = int(r_back_right[i])

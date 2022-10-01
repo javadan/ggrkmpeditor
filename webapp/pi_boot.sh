@@ -1,4 +1,5 @@
-sudo apt-get update && sudo apt-get install -y python3-pip libatlas-base-dev redis gunicorn
+sudo apt-get update && sudo apt-get install -y python3-pip libatlas-base-dev redis gunicorn pigpio
+sudo pigpiod
 pip3 install numpy==1.19.0 Flask-Session 
 pip3 install adafruit-circuitpython-pca9685 
 pip3 install adafruit-circuitpython-servokit
