@@ -14,7 +14,7 @@ A basic robot control UI integrating with a few sensors and controllers.
 Default movements can be saved for LEFT/RIGHT/FORWARD/BACKWARDS.
 
 Tested on Rpi Zero W (32 bit) and Rpi 4 (64 bit).
-Realsense functionality works with the ggrrealsense project.  Tested with D455 depth camera.
+Realsense functionality works with the [ggrrealsense](https://github.com/javadan/ggrrealsense) project.  Tested with D455 depth camera.
 Lidar used is RPLidar A1M8.  
 
 Configure the settings dictionary in config.py.
