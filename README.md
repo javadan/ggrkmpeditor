@@ -14,7 +14,8 @@ A basic robot control UI integrating with a few sensors and controllers.
 Default movements can be saved for LEFT/RIGHT/FORWARD/BACKWARDS.
 
 Tested on Rpi Zero W (32 bit) and Rpi 4 (64 bit).
-Realsense functionality works with the ggrrealsense project.
+Realsense functionality works with the [ggrrealsense](https://github.com/javadan/ggrrealsense) project.  Tested with D455 depth camera.
+Lidar used is RPLidar A1M8.  
 
 Configure the settings dictionary in config.py.
 
@@ -24,13 +25,16 @@ Options:
     lidar : has RPLidar attached at /dev/ttyUSB0
     pca9685_robot : Robot is using PCA9685 16-channel 12-bit PWM controller
     scservo_robot : Robot is using Feetech SC servos via URT-1 controller
+    gpio_on_5_6_13_19_robot : Robot has servos directly connected to (BCM pins) 5, 6, 13, 19
     arduino_115200 : Robot is using an Arduino, returning Left (L), Front (F), Right (R) distances over serial 
     realsense : Robot is using Realsense D4XX depth/rgb sensor
     realsense_url : URL to retrieve Realsense data
     picamera : Has 32-bit RPi 'raspi' camera attached 
     libcamera : Has 64-bit RPi 'libcamera' camera attached
+    ultrasound_echo_on_pin_22 : Ultrasound sensor echo pin, for taking pictures on detection
+    ultrasound_trigger_on_pin_27 : Ultrasound sensor trigger pin, for taking pictures on detection
     continuous_servo_on_pin_25 : For gripper robots, additional servo features (TODO)
-    has_switches_on_pins_23_34 : For gripper robots, additional (2) switch inputs
+    has_switches_on_pins_23_34 : For gripper robots, additional (2) switch inputs (used for preventing continuous servo death)
 ```
     
 Hardware setup:
@@ -69,6 +73,9 @@ Features:
     - UI displays Lidar map if attached.
     
     - UI has run button, and kill switch.
+    
+    - UI takes pictures, and can run a thread to take pictures on ultrasound detection
+        * Note that there is currently a bug in picamera2 logging, which causes this thread to crash after a few minutes (TODO)
     
     - UI has default motions for LEFT/RIGHT/FORWARD/BACKWARDS, set with the context menu (right click) on the motion list.
         * This is a prerequisite for the 'Turn on Brain' button. 
