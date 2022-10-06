@@ -150,12 +150,12 @@
 	
 	.horizontal-slider-wrapper {
 	  display: inline-block;
-	  width: 150px;
+	  width: 250px;
 	  height: 20px;
 	  padding: 0;
 	}
 	.horizontal-slider-wrapper input {
-	  width: 150px;
+	  width: 250px;
 	  height: 20px;
 	  margin: 0;
 	}
@@ -190,6 +190,10 @@
 	  transform: rotate(-90deg);
 	}
 
+	.sliderbox {
+          border-style: dotted;
+	}
+
 	</style>
 
 
@@ -202,7 +206,7 @@
   <!-- BODY element: create a canvas and render a chart on it -->
   <body>
 
-            <div id="log"></div>
+            <div style="height:120px;width:520px;border:1px solid #ccc;font:16px/26px Georgia, Garamond, Serif;overflow:auto;" id="log"></div>
 <table>
 <tr>
 	<td>
@@ -261,6 +265,10 @@
 			</tr>
 			<tr>
 				<td>
+			          <div class="horizontal-slider-wrapper">
+					 SHIFT UP/DOWN
+			          </div>
+				 <div class="sliderbox">
 			          <div class="slider-wrapper2">
 			            <input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftFR" oninput="FRShift();" onchange="FRShift();">
 			          </div>
@@ -273,8 +281,15 @@
 			          <div class="slider-wrapper2">
 			            <input type="range" class="slider" step="1" value="0" min="-50" max="50" id="shiftBL" oninput="BLShift();" onchange="BLShift();">
 			          </div>
+			         </div>
 
 				  <br/>
+
+
+			          <div class="horizontal-slider-wrapper">
+					  PHASE LEFT/RIGHT
+			          </div>
+				 <div class="sliderbox">
 			          <div class="horizontal-slider-wrapper">
 			            <input type="range" class="slider" step="1" value="0" min="-150" max="150" id="phaseFR" oninput="FRPhase();" onchange="FRPhase();">
 			          </div>
@@ -290,8 +305,14 @@
 			          <div class="horizontal-slider-wrapper">
 			            <input type="range" class="slider" step="1" value="0" min="-150" max="150" id="phaseBL" oninput="BLPhase();" onchange="BLPhase();">
 			          </div>
+			         </div>
 
 				  <br/>
+
+			          <div class="horizontal-slider-wrapper">
+					 DAMPEN/AMPLIFY
+			          </div>
+				 <div class="sliderbox">
 
 			          <div class="slider-wrapper2">
 			            <input type="range" class="slider" step=".1" value="1" min="0.5" max="1.5" id="ampFR" oninput="FRAmp();" onchange="FRAmp();">
@@ -305,7 +326,29 @@
 			          <div class="slider-wrapper2">
 			            <input type="range" class="slider" step=".1" value="1" min="0.5" max="1.5" id="ampBL" oninput="BLAmp();" onchange="BLAmp();">
 			          </div>
+			         </div>
 
+
+				  <br/>
+
+
+			          <div class="horizontal-slider-wrapper">
+					 STRETCH
+			          </div>
+				 <div class="sliderbox">
+			          <div class="slider-wrapper2">
+			            <input type="range" class="slider" step="1" value="100" min="50" max="100" id="sFR" oninput="FRStretch();" onMouseDown="FRStretchSet();">
+			          </div>
+			          <div class="slider-wrapper2">
+			            <input type="range" class="slider" step="1" value="100" min="50" max="100" id="sFL" oninput="FLStretch();" onMouseDown="FLStretchSet();">
+			          </div>
+			          <div class="slider-wrapper2">
+			            <input type="range" class="slider" step="1" value="100" min="50" max="100" id="sBR" oninput="BRStretch();" onMouseDown="BRStretchSet();">
+			          </div>
+			          <div class="slider-wrapper2">
+			            <input type="range" class="slider" step="1" value="100" min="50" max="100" id="sBL" oninput="BLStretch();" onMouseDown="BLStretchSet();">
+			          </div>
+                                 </div>
 
 				  <br/>
 
@@ -1264,6 +1307,73 @@ function BLAmp(event) {
    //fr_last_amp_value = fr_amp_value;
    window.myChart.update();
 }
+
+const makeRepeated = (arr, repeats) => Array.from({ length: repeats }, () => arr).flat();
+var ARRCOPY_1;
+var ARRCOPY_2;
+var ARRCOPY_3;
+var ARRCOPY_4;
+
+function FRStretchSet(event) {
+   ARRCOPY_1 = JSON.parse(JSON.stringify(myChart.data.datasets[0].data));
+}
+function FLStretchSet(event) {
+   ARRCOPY_2 = JSON.parse(JSON.stringify(myChart.data.datasets[1].data));
+}
+function BRStretchSet(event) {
+   ARRCOPY_3 = JSON.parse(JSON.stringify(myChart.data.datasets[2].data));
+}
+function BLStretchSet(event) {
+   ARRCOPY_4 = JSON.parse(JSON.stringify(myChart.data.datasets[3].data));
+}
+
+
+
+function FRStretch(event) {
+   fr_s_value = document.getElementById("sFR").value;
+   ARRLEN = myChart.data.datasets[0].data.length;
+   ARRCOPY = makeRepeated(ARRCOPY_1, 3);
+    
+   for (var j=0; j<ARRLEN; j++) {
+	   myChart.data.datasets[0].data[j] = ARRCOPY[Math.floor(j*100/fr_s_value)];
+   }
+   window.myChart.update();
+}
+
+function FLStretch(event) {
+   fl_s_value = document.getElementById("sFL").value;
+   ARRLEN = myChart.data.datasets[1].data.length;
+   ARRCOPY = makeRepeated(ARRCOPY_2, 3);
+
+   for (var j=0; j<ARRLEN; j++) {
+	   myChart.data.datasets[1].data[j] = ARRCOPY[Math.floor(j*100/fl_s_value)];
+   }
+   window.myChart.update();
+}
+
+function BRStretch(event) {
+   br_s_value = document.getElementById("sBR").value;
+   ARRLEN = myChart.data.datasets[2].data.length;
+   ARRCOPY = makeRepeated(ARRCOPY_3, 3);
+
+   for (var j=0; j<ARRLEN; j++) {
+	   myChart.data.datasets[2].data[j] = ARRCOPY[Math.floor(j*100/br_s_value)];
+   }
+   window.myChart.update();
+}
+
+function BLStretch(event) {
+   bl_s_value = document.getElementById("sBL").value;
+   ARRLEN = myChart.data.datasets[3].data.length;
+   ARRCOPY = makeRepeated(ARRCOPY_4, 3);
+
+   for (var j=0; j<ARRLEN; j++) {
+	   myChart.data.datasets[3].data[j] = ARRCOPY[Math.floor(j*100/bl_s_value)];
+   }
+   window.myChart.update();
+}
+
+
 
 
 
