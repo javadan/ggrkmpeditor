@@ -1309,7 +1309,48 @@ def save():
     return index()
 
 
+@app.route('/fidget_slowly', methods=['POST', 'GET'])
+def fidget_slowly():
 
+    @copy_current_request_context
+    def runFidgetSlowlyTask():
+        while True:
+            if stop_robot_event.is_set(): 
+                print(f'end {threading.current_thread().name} ')
+                return
+            #TODO
+            path = './motions/'
+            children = []
+     
+            for name in os.listdir(path):
+                subpath = os.path.join(path, name)
+                if os.path.isdir(subpath):
+                    children.append(subpath)
+    
+            child = random.choice(children)
+            print("Running ", child)
+    
+            checkpoints = glob(child + '/*')
+            checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
+            sorted_saves = sorted(checkpoint_dirs,  reverse=True)
+    
+            adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+            front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
+            if random.randint(0,50) == 1:
+                time.sleep(random.randint(20, 60))
+            
+            runadjustedmotiondirect([front_right, front_left, back_right, back_left], False, False)  # don't extract dict, don't run as thread
+
+    stop_robot_event.clear()
+    t = Thread(target=runFidgetSlowlyTask, args=(), daemon=True)  
+    t.start()
+    results = {'processed': 'false'}
+    return jsonify(results)
+
+
+
+
+    
 @app.route('/fidget', methods=['POST', 'GET'])
 def fidget():
 
@@ -1391,15 +1432,18 @@ def load_and_validate_motion(directory, adjuster_array):
 
 
 
-@app.route('/runBrain', methods=['POST'])
-def runBrain():
 
+
+@app.route('/runBrain', methods=['POST'])
+@app.route('/runBrain/slow', methods=['POST'])
+def runBrain(go_slow=False):
+    print(go_slow)
     @copy_current_request_context
-    def runBrainTask():
-        
+    def runBrainTask(go_slow = False):
+         
         @copy_current_request_context
         def runMotionLogic(TOO_CLOSE, L, F, R):
-
+    
             priority = 0
             
             # High Priority '0'
@@ -1430,23 +1474,25 @@ def runBrain():
                 runMotionFromCategory("FORWARD")
             elif priority == 0 and F <= TOO_CLOSE:
                 runMotionFromCategory("BACKWARDS")
-
-
-
-
+    
+    
+    
+    
         def poll_realsense():
             response = requests.post(url=realsense_url)
-            print(response)
-            return response
-
-
-
-
+            print(response.content.decode("utf-8"))
+            motion = response.content.decode("utf-8")
+    
+            return motion
+    
+    
+    
         @copy_current_request_context
         def runMotionFromCategory(category):
-
+    
             try: 
-
+                print ("Running motion from category: ", category)
+    
                 try:
                     four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
                 except:
@@ -1525,7 +1571,7 @@ def runBrain():
                     checkpoints = glob(category_dir + '/*')
                     checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
                     sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
-
+    
                     adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
                     front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
                     
@@ -1535,7 +1581,7 @@ def runBrain():
                     checkpoints = glob(category_dir + '/*')
                     checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
                     sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
-
+    
                     adjusters = [session['g1_adjuster'], session['g2_adjuster'], session['g3_adjuster'], session['g4_adjuster']]
                     gripper_1, gripper_2, gripper_3, gripper_4 = load_and_validate_motion(sorted_saves[0], adjusters)
                     
@@ -1551,7 +1597,7 @@ def runBrain():
                             
                             DELAY = float(session['DELAY'])
                             time.sleep(DELAY)
-
+    
                     elif is_pca9685_robot:
                         for i in range(len(front_right)):
                             if stop_robot_event.is_set(): 
@@ -1570,45 +1616,61 @@ def runBrain():
                             DELAY = float(session['DELAY'])
                             time.sleep(DELAY)
                             
-
+    
             except:
                 print(traceback.format_exc())
     
     
         #end runMotionFromCategory
     
-
+    
         if (has_lidar):
             while True:
-
+    
                 if stop_robot_event.is_set():
                     print(f'end {threading.current_thread().name} ')
                     return
-
+    
                 try:
                     TOO_CLOSE = 0.2
-
+    
                     L = float(mem.retrieveState('L'))
                     F = float(mem.retrieveState('F'))
                     R = float(mem.retrieveState('R'))
-
+    
                     print (L, " ", F, " ", R)
-
+    
                     runMotionLogic(TOO_CLOSE, L, F, R)
-
+    
                 except:
                     print(traceback.format_exc())
                     print("ERROR RETRIEVING LIDAR STATE")
                     results = {'processed': 'true'}
                     return jsonify(results)
-
-
+    
+    
         elif (has_realsense):
-            response = poll_realsense()
-            #For realsense, the server advises direction
-            runMotionFromCategory(response)
+            while True:
+    
+                if stop_robot_event.is_set():
+                    print(f'end {threading.current_thread().name} ')
+                    return
+    
+                try:
+                    response = poll_realsense()
+    
+                    runMotionFromCategory(response)
+    
+                    if (go_slow):
+                        if random.randint(0,50) == 1:
+                            time.sleep(random.randint(20, 60))
+    
+    
+                except:
+                    print(traceback.format_exc())
+                    print("ERROR RETRIEVING LIDAR STATE")
              
-   
+    
         elif (has_arduino_at_115200):
         
             TOO_CLOSE=40
@@ -1629,10 +1691,10 @@ def runBrain():
                     return jsonify(results)
             
                 runMotionLogic(TOO_CLOSE, L, F, R)
-                
+            
 
     stop_robot_event.clear()
-    t = Thread(target=runBrainTask, args=(), daemon=True)  #check the syntax
+    t = Thread(target=runBrainTask, args=(go_slow,), daemon=True)  #check the syntax
     t.start()
 
     results = {'processed': 'true'}
