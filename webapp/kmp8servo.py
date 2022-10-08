@@ -1898,6 +1898,31 @@ def get_directory_listing(path):
     return children
 
 
+
+@app.route('/get_motion_data', methods=['POST', 'GET'])
+def get_motion_data():
+    data = request.get_json()
+    print(data)
+    load_id = data[0]['data']
+    checkpoints = glob('./motions/' + load_id + '/*')
+    
+    cleanedList = [x for x in checkpoints if os.path.isdir(x)]
+    sorted_saves = sorted(cleanedList,  reverse=True) 
+    
+    try: 
+        front_right = np.load(sorted_saves[0] + '/angle_front_right_180.npy', allow_pickle=True)
+        front_left = np.load(sorted_saves[0] + '/angle_front_left_180.npy', allow_pickle=True)
+        back_right = np.load(sorted_saves[0] + '/angle_back_right_180.npy', allow_pickle=True)
+        back_left = np.load(sorted_saves[0] + '/angle_back_left_180.npy', allow_pickle=True)
+    except:
+        print("ERROR LOADING MOTION 1") 
+    
+    results = [front_right.tolist(), front_left.tolist(), back_right.tolist(), back_left.tolist()]
+
+    return jsonify(results)
+    
+
+
 @app.route('/images_kill_switch', methods=['POST', 'GET'])
 def images_kill_switch():
     stop_images_event.set()

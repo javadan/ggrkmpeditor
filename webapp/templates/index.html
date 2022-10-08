@@ -1986,8 +1986,36 @@ $(function () {
 	     console.log(node);
 	     console.log(data);
              load();
-	})
-});
+		})
+	.bind("hover_node.jstree", function (event,node) {
+             //var node = $(event.target).closest("li");
+	     console.log(node);
+	     console.log(node.node.id);
+	     var saveData = [{"data":node.node.id}];
+             
+                $.ajax({
+                  type: "POST",
+                  url: "/get_motion_data",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  success: function(result) {
+                    console.log(result);
+                  }
+                });
+
+	   var mouseX;
+           var mouseY;
+           mouseX = event.pageX; 
+           mouseY = event.pageY;
+
+	   var div = document.createElement('DivToShow');
+           $('#DivToShow').css({'position':'absolute','top':mouseY,'left':mouseX});//.fadeIn('slow');
+			
+		})
+
+
+	}) ;
 
 //Add right click context menu to set default direction motions
 function customMenu(node) {
