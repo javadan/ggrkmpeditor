@@ -700,16 +700,16 @@ def index():
     if 'back_left_adjuster' not in session:
         session['back_left_adjuster'] = 0
 
-    if 'gripper_1_adjuster' not in session:
+    if 'g1_adjuster' not in session:
         session['g1_adjuster'] = 0
     
-    if 'gripper_2_adjuster' not in session:
+    if 'g2_adjuster' not in session:
         session['g2_adjuster'] = 0
 
-    if 'gripper_3_adjuster' not in session:
+    if 'g3_adjuster' not in session:
         session['g3_adjuster'] = 0
 
-    if 'gripper_4_adjuster' not in session:
+    if 'g4_adjuster' not in session:
         session['g4_adjuster'] = 0
         
     #Some debugging
