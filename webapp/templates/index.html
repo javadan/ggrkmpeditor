@@ -636,7 +636,9 @@
 		<br/>
 		<button onclick="fiddleAroundAdjusted()">FIDGET TO THE WAVES</button> 
 		<button onclick="trysomevariant()">RANDOM SHUFFLED VARIANT</button> 
+		<button onclick="runSlowFidget()">SLOW FIDGET</button>
 		<button onclick="runBrain()">TURN ON BRAIN</button>
+		<button onclick="runSlowBrain()">TURN ON SLOW BRAIN</button>
 	
 	 <div class="container">
                <div id="newtask">
@@ -753,6 +755,44 @@ function trysomevariant() {
    }
   });
 
+}
+
+
+
+function runSlowBrain() {
+    console.log("TURNING ON SLOW BRAIN...");
+    
+
+ $.ajax({
+   type: "POST",
+   url: "/runBrain/slow",
+   data: JSON.stringify([]),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
+}
+
+
+
+
+
+function runSlowFidget() {
+    console.log("FIDGETING SLOWLY...");
+    
+
+ $.ajax({
+   type: "POST",
+   url: "/fidget_slowly",
+   data: JSON.stringify([]),
+   contentType: "application/json",
+   dataType: 'json',
+   success: function(result) {
+     console.log(result);
+   }
+ });
 }
 
 
@@ -1946,8 +1986,36 @@ $(function () {
 	     console.log(node);
 	     console.log(data);
              load();
-	})
-});
+		})
+	.bind("hover_node.jstree", function (event,node) {
+             //var node = $(event.target).closest("li");
+	     console.log(node);
+	     console.log(node.node.id);
+	     var saveData = [{"data":node.node.id}];
+             
+                $.ajax({
+                  type: "POST",
+                  url: "/get_motion_data",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  success: function(result) {
+                    console.log(result);
+                  }
+                });
+
+	   var mouseX;
+           var mouseY;
+           mouseX = event.pageX; 
+           mouseY = event.pageY;
+
+	   var div = document.createElement('DivToShow');
+           $('#DivToShow').css({'position':'absolute','top':mouseY,'left':mouseX});//.fadeIn('slow');
+			
+		})
+
+
+	}) ;
 
 //Add right click context menu to set default direction motions
 function customMenu(node) {
