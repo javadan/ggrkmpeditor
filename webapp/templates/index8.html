@@ -16,11 +16,34 @@
 
    
    <script type="text/javascript">
-     
+            var front_right_preview;
+             var front_left_preview;
+             var back_right_preview;
+             var back_left_preview;
+        var mouse_x = 0;
+        var mouse_y = 0;
+        
+	$(document).ready(function() {
+
+           //for tracking mouse position
+           $(document).mousemove(function(event) {
+             mouse_x = event.pageX;
+             mouse_y = event.pageY;
+           });
+
+          });
+
+
+
    </script>
    
   <!-- BODY element: create a canvas and render a chart on it -->
   <body>
+
+	  <div id="div_preview" name="div_preview" style="max-width: 800px; display:none">
+             <canvas id="canvas_preview" width="780" height="430"></canvas>
+        </div>
+
 
 	  <!--3 cols-->
 <table>
@@ -900,6 +923,106 @@ $(function () {
              console.log(data);
              load();
         })
+	        .bind("dehover_node.jstree", function (event,node) {
+
+              var jq_div = $('#div_preview');
+              jq_div.hide();
+
+                })
+        .bind("hover_node.jstree", function (event,node) {
+             //var node = $(event.target).closest("li");
+             console.log(node);
+             console.log(node.node.id);
+             var saveData = [{"data":node.node.id}];
+
+                $.ajax({
+                  type: "POST",
+                  url: "/get_motion_data",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  async:false,
+                  success: function(result) {
+                    console.log(result);
+                    front_right_preview = result[0];
+                    front_left_preview = result[1];
+                    back_right_preview = result[2];
+                    back_left_preview = result[3];
+                  }
+                });
+
+                 console.log(mouse_x);
+                 console.log(mouse_y);
+
+              var jq_div = $('#div_preview');
+              jq_div.css({'position':'absolute',border:'solid 1px #fc0;', 'z-index': 100, 'display':'block','top':mouse_y-400,'left':mouse_x+50}).show();
+
+
+               var ctx = document.getElementById("canvas_preview").getContext("2d");
+               canvas_preview = document.getElementById("canvas_preview");
+
+               // Draw a line chart with two data sets
+
+                       var previewDatasetValues =  {
+                               data: {
+                                   labels: x_data,
+                                   datasets: [
+                                       {
+                                           data: front_right_preview,
+                                           label: "Front Right",
+                                           borderColor: "#3e95cd",
+                                           fill: false
+                                       },
+                                       {
+                                           data: front_left_preview,
+                                           label: "Front Left",
+                                           borderColor: "#cd953e",
+                                           fill: false
+                                       },
+                                       {
+                                           data: back_right_preview,
+                                           label: "Back Right",
+                                           borderColor: "#ffff00",
+                                           fill: false
+                                       },
+                                       {
+                                           data: back_left_preview,
+                                           label: "Back Left",
+                                           borderColor: "#0000ff",
+                                           fill: false
+                                       }
+                                   ]
+                               }};
+
+
+                        window.preview_canvas_chart = Chart.Line(ctx, {
+                            data: previewDatasetValues.data,
+                            options: {
+                                animation: {
+                                    duration: 0
+                                },
+                          scales: {
+                             xAxes: [{
+                                ticks: {
+                                   userCallback: function(item, index) {
+                                      if (!(index % 5)) return item;
+                                   },
+                                   autoSkip: false
+                                }
+                             }],
+                             yAxes: [{
+                                ticks: {
+                                   beginAtZero: true
+                                }
+                             }]
+                          }
+                           }
+                        });
+
+                        window.preview_canvas_chart.update();
+                })
+
+
 });
 
 
@@ -925,6 +1048,106 @@ $(function () {
              console.log(data);
              gripper();
         })
+	        .bind("dehover_node.jstree", function (event,node) {
+
+              var jq_div = $('#div_preview');
+              jq_div.hide();
+
+                })
+        .bind("hover_node.jstree", function (event,node) {
+             //var node = $(event.target).closest("li");
+             console.log(node);
+             console.log(node.node.id);
+             var saveData = [{"data":node.node.id}];
+
+                $.ajax({
+                  type: "POST",
+                  url: "/get_motion_data",
+                  data: JSON.stringify(saveData),
+                  contentType: "application/json",
+                  dataType: 'json',
+                  async:false,
+                  success: function(result) {
+                    console.log(result);
+                    front_right_preview = result[0];
+                    front_left_preview = result[1];
+                    back_right_preview = result[2];
+                    back_left_preview = result[3];
+                  }
+                });
+
+                 console.log(mouse_x);
+                 console.log(mouse_y);
+
+              var jq_div = $('#div_preview');
+              jq_div.css({'position':'absolute',border:'solid 1px #fc0;', 'z-index': 100, 'display':'block','top':mouse_y-400,'left':mouse_x+50}).show();
+
+
+               var ctx = document.getElementById("canvas_preview").getContext("2d");
+               canvas_preview = document.getElementById("canvas_preview");
+
+               // Draw a line chart with two data sets
+
+                       var previewDatasetValues =  {
+                               data: {
+                                   labels: x_data,
+                                   datasets: [
+                                       {
+                                           data: front_right_preview,
+                                           label: "Front Right",
+                                           borderColor: "#3e95cd",
+                                           fill: false
+                                       },
+                                       {
+                                           data: front_left_preview,
+                                           label: "Front Left",
+                                           borderColor: "#cd953e",
+                                           fill: false
+                                       },
+                                       {
+                                           data: back_right_preview,
+                                           label: "Back Right",
+                                           borderColor: "#ffff00",
+                                           fill: false
+                                       },
+                                       {
+                                           data: back_left_preview,
+                                           label: "Back Left",
+                                           borderColor: "#0000ff",
+                                           fill: false
+                                       }
+                                   ]
+                               }};
+
+
+                        window.preview_canvas_chart = Chart.Line(ctx, {
+                            data: previewDatasetValues.data,
+                            options: {
+                                animation: {
+                                    duration: 0
+                                },
+                          scales: {
+                             xAxes: [{
+                                ticks: {
+                                   userCallback: function(item, index) {
+                                      if (!(index % 5)) return item;
+                                   },
+                                   autoSkip: false
+                                }
+                             }],
+                             yAxes: [{
+                                ticks: {
+                                   beginAtZero: true
+                                }
+                             }]
+                          }
+                           }
+                        });
+
+                        window.preview_canvas_chart.update();
+                })
+
+
 });
 
 
