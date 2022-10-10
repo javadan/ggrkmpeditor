@@ -1140,6 +1140,7 @@ def combo():
             comboArray[1] = motion2
     except:
         print("FAIL combo load")
+        print(traceback.format_exc())
 
     #load text file, get motions 1 and 2
     session['MOTION'] = comboArray[0]
@@ -1361,26 +1362,90 @@ def fidget():
                 print(f'end {threading.current_thread().name} ')
                 return
     
-    
-            path = './motions/'
-            children = []
-     
-            for name in os.listdir(path):
-                subpath = os.path.join(path, name)
-                if os.path.isdir(subpath):
-                    children.append(subpath)
-    
-            child = random.choice(children)
-            print("Running ", child)
-    
-            checkpoints = glob(child + '/*')
-            checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
-            sorted_saves = sorted(checkpoint_dirs,  reverse=True)
-    
-            adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
-            front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
-            runadjustedmotiondirect([front_right, front_left, back_right, back_left], False, False)  # don't extract dict, don't run as thread
-    
+   
+            try:
+                four_servo_mode = session['MODE'] is None or session['MODE'] == "Four" 
+            except:
+                session['MODE'] = "Four"
+                four_servo_mode = True
+           
+            if four_servo_mode:
+
+                path = './motions/'
+                children = []
+         
+                for name in os.listdir(path):
+                    subpath = os.path.join(path, name)
+                    if os.path.isdir(subpath):
+                        children.append(subpath)
+        
+                child = random.choice(children)
+                print("Running ", child)
+        
+                checkpoints = glob(child + '/*')
+                checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
+                sorted_saves = sorted(checkpoint_dirs,  reverse=True)
+        
+                adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+                front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
+                runadjustedmotiondirect([front_right, front_left, back_right, back_left], False, False)  # don't extract dict, don't run as thread
+
+            else:
+
+                path = './motions8/'
+                children = []
+         
+                for name in os.listdir(path):
+                    subpath = os.path.join(path, name)
+                    if os.path.isdir(subpath):
+                        children.append(subpath)
+        
+                child = random.choice(children)
+                
+                checkpoints = glob(child + '/*')
+                checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
+                sorted_saves_combos = sorted(checkpoint_dirs,  reverse=True)
+                print("Running ", child)
+        
+                comboArray = ['walk', 'walk']
+                try: 
+               
+                    print("LOADING ", sorted_saves_combos[0] + "/combo.txt")
+                    with open(sorted_saves_combos[0] + "/combo.txt") as f:
+                        print("OPENED")
+                        motion1 = f.readline().rstrip("\n") 
+                        motion2 = f.readline().rstrip("\n") 
+                        print( motion1 )
+                        print( motion2 )
+                
+                        comboArray[0] = motion1
+                        comboArray[1] = motion2
+                except:
+                    print("FAIL combo load")
+                    print(traceback.format_exc())
+                
+
+                category_dir = "./motions/" + comboArray[0]
+                checkpoints = glob(category_dir + '/*')
+                checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
+                sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
+
+                adjusters = [session['front_right_adjuster'], session['front_left_adjuster'], session['back_right_adjuster'], session['back_left_adjuster']]
+                front_right, front_left, back_right, back_left = load_and_validate_motion(sorted_saves[0], adjusters)
+                
+                #gripper
+                
+                category_dir = "./motions/" + comboArray[1]
+                checkpoints = glob(category_dir + '/*')
+                checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
+                sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
+
+                adjusters = [session['g1_adjuster'], session['g2_adjuster'], session['g3_adjuster'], session['g4_adjuster']]
+                gripper_1, gripper_2, gripper_3, gripper_4 = load_and_validate_motion(sorted_saves[0], adjusters)
+                    
+                runadjustedmotiondirect([front_right, front_left, back_right, back_left, gripper_1, gripper_2, gripper_3, gripper_4], False, False)  
+                # don't extract dict, don't run as thread
+
 
 
     stop_robot_event.clear()
@@ -1542,8 +1607,9 @@ def runBrain(go_slow=False):
                             
                             
                 else:  #8 servos
-                 
-                    category_dir = "./motions8/" + session[category] 
+                    print(category)
+                    category_dir = "./motions8/" + session[category + "8"]  #TRICKY 
+                    print(category_dir)
                     checkpoints = glob(category_dir + '/*')
                     checkpoint_dirs = [x for x in checkpoints if os.path.isdir(x)]
                     sorted_saves = sorted(checkpoint_dirs,  reverse=True) 
@@ -1553,7 +1619,7 @@ def runBrain(go_slow=False):
                     comboArray = ['walk', 'walk']
                     try: 
                 
-                        print("LOADING ", sorted_saves[0] + "/combo.txt")
+                        print("LOADING ", sorted_saves[0], "/combo.txt")
                         with open(sorted_saves[0] + "/combo.txt") as f:
                             print("OPENED")
                             motion1 = f.readline().rstrip("\n") 
@@ -1565,6 +1631,7 @@ def runBrain(go_slow=False):
                             comboArray[1] = motion2
                     except:
                         print("FAIL combo load")
+                        print(traceback.format_exc())
                     
                     
                     category_dir = "./motions/" + comboArray[0]
@@ -1764,10 +1831,17 @@ def runadjustedmotiondirect(data, needs_to_extract, as_thread):
       
          
         if not four_servo_mode:
-            gripper_1 = gripper_1_update['gripper_1']
-            gripper_2 = gripper_2_update['gripper_2']
-            gripper_3 = gripper_3_update['gripper_3']
-            gripper_4 = gripper_4_update['gripper_4']
+            if needs_to_extract:
+                gripper_1 = gripper_1_update['gripper_1']
+                gripper_2 = gripper_2_update['gripper_2']
+                gripper_3 = gripper_3_update['gripper_3']
+                gripper_4 = gripper_4_update['gripper_4']
+            else:
+                gripper_1 = gripper_1_update
+                gripper_2 = gripper_2_update
+                gripper_3 = gripper_3_update
+                gripper_4 = gripper_4_update
+
 
             motions = [gripper_1, gripper_2, gripper_3, gripper_4]
             adjusters = [session['g1_adjuster'], session['g2_adjuster'], session['g3_adjuster'], session['g4_adjuster']]
