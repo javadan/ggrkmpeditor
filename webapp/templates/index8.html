@@ -926,7 +926,7 @@ $(function () {
 	'contextmenu' : {
 			'items' : customMenu
         },
-        'plugins' : ["wholerow"]
+        'plugins' : ["wholerow", "contextmenu"]
 		}).bind("dblclick.jstree", function (event) {
              var node = $(event.target).closest("li");
              var data = node.data("combotree");
