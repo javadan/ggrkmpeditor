@@ -4,6 +4,14 @@
 Gallus Gallus Roboticus 
 Kinetic Motion Primitives editor
 
+Four Servo example:
+![Four servo example](https://github.com/javadan/ggrkmpeditor/blob/master/GGR4.png "GGR4")
+
+Eight Servo example:
+![Eight servo example](https://github.com/javadan/ggrkmpeditor/blob/master/GGR8.png "GGR8")
+
+
+
 Copyleft License
 
 [mirandamoss.com/gallusgallusroboticus](https://mirandamoss.com/gallusgallusroboticus)
