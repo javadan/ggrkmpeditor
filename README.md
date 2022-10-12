@@ -1,7 +1,7 @@
 # ggrkmpeditor
 ## GGR KMP Editor 
 
-Backup for Gallus Gallus Roboticus project 
+Gallus Gallus Roboticus 
 Kinetic Motion Primitives editor
 
 Copyleft License
