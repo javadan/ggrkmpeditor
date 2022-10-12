@@ -54,7 +54,7 @@ Setup (Note: For global installation, as this is the only program running on the
     chmod 755 run.sh
     ./run.sh
     
-    Connect browser to URL of robot service.
+    Connect browser to URL of robot service. Typically 192.168.xxx.xxx:8000.
 ```
 
 Features:
@@ -66,13 +66,15 @@ Features:
         
     - Use Adjusters if servo angles were not calibrated to 90 degrees, prior to robot assembly.
     
-    - UI uses a wavetable editor, allowing shifting up and down, left and right, and scaling up and down.
+    - UI uses a wavetable editor, allowing shifting up and down, left and right, and scaling up and down, stretching left and right.
     
-    - UI shows saved motions, to load and save.
+    - UI shows saved motions, to load and save.  Hover-over shows load preview.
     
     - UI displays Lidar map if attached.
     
     - UI has run button, and kill switch.
+    
+    - UI has a fidget feature, to run saved motions randomly.  
     
     - UI takes pictures, and can run a thread to take pictures on ultrasound detection
         * Note that there is currently a bug in picamera2 logging, which causes this thread to crash after a few minutes (TODO)
